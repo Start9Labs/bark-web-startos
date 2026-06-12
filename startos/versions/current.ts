@@ -1,18 +1,17 @@
 import { IMPOSSIBLE, VersionInfo } from '@start9labs/start-sdk'
 
 export const current = VersionInfo.of({
-  version: '0.2.4:0',
+  version: '0.2.5:0',
   releaseNotes: {
-    en_US:
-      'Initial Start9 release. Self-custodial Ark wallet for Bitcoin mainnet.',
+    en_US: 'Updates Bark Wallet to 0.2.5: fixes wallet creation over plain HTTP.',
     es_ES:
-      'Versión inicial de Start9. Monedero Ark autocustodial para la red principal de Bitcoin.',
+      'Actualiza Bark Wallet a 0.2.5: corrige la creación del monedero sobre HTTP simple.',
     de_DE:
-      'Erste Start9-Veröffentlichung. Selbstverwahrendes Ark-Wallet für das Bitcoin-Mainnet.',
+      'Aktualisiert Bark Wallet auf 0.2.5: behebt die Wallet-Erstellung über einfaches HTTP.',
     pl_PL:
-      'Pierwsze wydanie Start9. Samodzielny portfel Ark dla sieci głównej Bitcoin.',
+      'Aktualizuje Bark Wallet do 0.2.5: naprawia tworzenie portfela przez zwykłe HTTP.',
     fr_FR:
-      'Première version Start9. Portefeuille Ark auto-hébergé pour le réseau principal Bitcoin.',
+      'Met à jour Bark Wallet vers 0.2.5 : corrige la création du portefeuille via HTTP simple.',
   },
   migrations: {
     up: async ({ effects }) => {},

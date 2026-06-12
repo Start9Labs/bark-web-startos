@@ -7,6 +7,7 @@ import {
   barkNetwork,
   chainSource,
   uiPort,
+  walletDataPath,
   walletDir,
 } from './utils'
 
@@ -68,6 +69,7 @@ export const main = sdk.setupMain(async ({ effects }) => {
         env: {
           PORT: String(apiPort),
           WALLET_DIR: walletDir,
+          WALLET_DATA_PATH: walletDataPath,
           BARKD_URL: `http://127.0.0.1:${barkdPort}`,
           ARK_SERVER: arkServer,
           CHAIN_SOURCE: chainSource,

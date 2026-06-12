@@ -172,6 +172,7 @@ dependencies: none
 startos_managed_env_vars:
   - PORT
   - WALLET_DIR
+  - WALLET_DATA_PATH
   - BARKD_URL
   - ARK_SERVER
   - CHAIN_SOURCE
