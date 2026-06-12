@@ -12,9 +12,7 @@ export const setUiPassword = sdk.Action.withoutInput(
     description: i18n(
       'Generate a new password for logging in to the Bark Wallet web interface. The username is always "admin".',
     ),
-    warning: i18n(
-      'This replaces any existing password. Update saved logins after running it.',
-    ),
+    warning: null,
     allowedStatuses: 'any',
     group: null,
     visibility: 'enabled',
