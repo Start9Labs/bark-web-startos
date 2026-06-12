@@ -2,10 +2,10 @@ import { setupManifest } from '@start9labs/start-sdk'
 import { long, short } from './i18n'
 
 export const manifest = setupManifest({
-  id: 'bark-web',
+  id: 'bark-wallet',
   title: 'Bark Wallet',
   license: 'MIT',
-  packageRepo: 'https://github.com/Start9Labs/bark-startos',
+  packageRepo: 'https://github.com/Start9Labs/bark-wallet-startos',
   upstreamRepo: 'https://gitlab.com/ark-bitcoin/labs/bark-web',
   marketingUrl: 'https://second.tech',
   donationUrl: null,
