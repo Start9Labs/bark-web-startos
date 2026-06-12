@@ -2,14 +2,14 @@ export const DEFAULT_LANG = 'en_US'
 
 const dict = {
   // main.ts
-  'Starting Hello World!': 0,
+  'Starting Bark Wallet!': 0,
   'Web Interface': 1,
   'The web interface is ready': 2,
   'The web interface is not ready': 3,
 
   // interfaces.ts
   'Web UI': 4,
-  'The web interface of Hello World': 5,
+  'The Bark Wallet web interface': 5,
 } as const
 
 /**

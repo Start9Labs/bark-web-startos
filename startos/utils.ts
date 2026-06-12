@@ -1,4 +1,9 @@
-// Here we define any constants or functions that are shared by multiple components
-// throughout the package codebase. This file will be unnecessary for many packages.
+export const uiPort = 8080
+export const apiPort = 4001
+export const barkdPort = 4000
 
-export const uiPort = 80
+export const walletDir = '/data/.bark'
+
+export const arkServer = 'https://ark.second.tech'
+export const chainSource = 'https://mempool.second.tech/api'
+export const barkNetwork = 'mainnet'

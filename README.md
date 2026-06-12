@@ -1,16 +1,16 @@
 <p align="center">
-  <img src="icon.svg" alt="Hello World Logo" width="21%">
+  <img src="icon.png" alt="Bark Wallet Logo" width="21%">
 </p>
 
-# Hello World on StartOS
+# Bark Wallet on StartOS
 
-> **Upstream repo:** <https://github.com/Start9Labs/hello-world>
+> **Upstream repo:** <https://gitlab.com/ark-bitcoin/labs/bark-web>
+>
+> Everything not listed in this document should behave the same as upstream
+> Bark. If a feature, setting, or behavior is not mentioned here, the upstream
+> documentation is accurate and fully applicable.
 
-A minimal reference service for StartOS. It displays a simple web page — nothing more. Use [this repository](https://github.com/Start9Labs/hello-world-startos) as a template when packaging a new service for StartOS.
-
-## Getting Started
-
-To learn how to use this template to create your own StartOS service package, see the [Packaging Guide](https://docs.start9.com/packaging).
+Bark is a self-custodial Bitcoin wallet built on the [Ark protocol](https://second.tech). Payments settle off-chain through Ark rounds for fast, low-fee transfers while the user keeps unilateral exit to the base chain. This package wraps the `bark-web` GUI together with the `barkd` wallet daemon and serves them as a single StartOS web service on Bitcoin mainnet.
 
 ---
 
@@ -33,39 +33,61 @@ To learn how to use this template to create your own StartOS service package, se
 
 ## Image and Container Runtime
 
-| Property      | Value                                  |
-| ------------- | -------------------------------------- |
-| Image         | `ghcr.io/start9labs/hello-world`       |
-| Architectures | x86_64, aarch64, riscv64               |
-| Command       | `hello-world`                          |
+| Property      | Value                                                            |
+| ------------- | ---------------------------------------------------------------- |
+| Image         | Custom (`bark.Dockerfile`)                                        |
+| Architectures | x86_64, aarch64                                                  |
+| Processes     | `barkd` (wallet daemon), node API proxy, nginx (SPA + reverse proxy) |
+
+A single image runs three processes, each supervised independently by StartOS:
+
+| Daemon  | Command                                              | Internal Port | Role                                            |
+| ------- | ---------------------------------------------------- | ------------- | ----------------------------------------------- |
+| `barkd` | `barkd --port 4000 --host 127.0.0.1 --datadir /data/.bark` | 4000          | Wallet daemon (HTTP + WebSocket)                |
+| `api`   | `node /app/api/dist/index.js`                        | 4001          | Hono proxy; injects the barkd bearer token      |
+| `nginx` | `nginx -g 'daemon off;'`                             | 8080          | Serves the SPA, proxies `/api/` and `/barkd-ws/` |
+
+The `barkd` binary is fetched from the upstream GitLab release with a pinned SHA-256 checksum; the `bark-web` SPA and API proxy are built from the upstream git tag.
 
 ---
 
 ## Volume and Data Layout
 
-| Volume | Mount Point | Purpose         |
-| ------ | ----------- | --------------- |
-| `main` | `/data`     | Persistent data |
+| Volume | Mount Point | Purpose                  |
+| ------ | ----------- | ------------------------ |
+| `main` | `/data`     | Wallet data (`/data/.bark`) |
+
+Everything the wallet persists lives under `/data/.bark`:
+
+- `db.sqlite` — wallet database
+- `mnemonic` — seed
+- `auth_token` — barkd bearer token (never reaches the browser)
 
 ---
 
 ## Installation and First-Run Flow
 
-No special setup. Install and start — the web page is immediately available.
+A `mkdir -p /data/.bark` oneshot runs before `barkd` starts on every launch. On first run the wallet is empty — the user creates or restores a wallet through the web UI. No StartOS-managed credentials are generated.
 
 ---
 
 ## Configuration Management
 
-No configurable settings. The service runs with no user-facing configuration.
+| StartOS-Managed (baked into the image)                          | Upstream-Managed                          |
+| --------------------------------------------------------------- | ----------------------------------------- |
+| Ark server `https://ark.second.tech`                            | Wallet creation, send/receive, refreshes  |
+| Chain source `https://mempool.second.tech/api`                  | (everything else via the bark-web UI)     |
+| Network `mainnet`                                               |                                           |
+
+These three values are passed to the API daemon as environment variables (`ARK_SERVER`, `CHAIN_SOURCE`, `BARK_NETWORK`). There is no StartOS config form; to change them, edit `startos/utils.ts` and rebuild.
 
 ---
 
 ## Network Access and Interfaces
 
-| Interface | Port | Protocol | Purpose              |
-| --------- | ---- | -------- | -------------------- |
-| Web UI    | 80   | HTTP     | Hello World web page |
+| Interface | Port | Protocol | Purpose             |
+| --------- | ---- | -------- | ------------------- |
+| Web UI    | 8080 | HTTP     | Bark Wallet web app |
 
 **Access methods:**
 
@@ -73,6 +95,8 @@ No configurable settings. The service runs with no user-facing configuration.
 - `<hostname>.local` with unique port
 - Tor `.onion` address
 - Custom domains (if configured)
+
+Ports 4000 (barkd) and 4001 (api) are bound to `127.0.0.1` only and are never exposed; the three daemons share the service network namespace.
 
 ---
 
@@ -86,49 +110,61 @@ None.
 
 **Included in backup:**
 
-- `main` volume
+- `main` volume (the entire `/data/.bark` wallet directory)
 
-**Restore behavior:** Volume is fully restored before the service starts.
+**Restore behavior:** the volume is fully restored before the service starts, returning the wallet exactly as it was. A user holding only the twelve-word seed can instead choose **Restore** in the web UI and rebuild balances from the Ark server.
 
 ---
 
 ## Health Checks
 
-| Check         | Method              | Messages                                                           |
-| ------------- | ------------------- | ------------------------------------------------------------------ |
-| Web Interface | Port listening (80) | Success: "The web interface is ready" / Error: "The web interface is not ready" |
+| Check         | Method                | Surfaced | Messages                                                      |
+| ------------- | --------------------- | -------- | ------------------------------------------------------------- |
+| Web Interface | Port listening (8080) | Yes      | "The web interface is ready" / "The web interface is not ready" |
+
+`barkd` (4000) and `api` (4001) readiness gate daemon startup ordering but are not displayed to the user.
 
 ---
 
 ## Dependencies
 
-None.
+None. The package talks to the hosted Ark server and chain source over the internet; it does not depend on a local Bitcoin node.
 
 ---
 
 ## Limitations and Differences
 
-1. **No meaningful functionality** — this is a reference/template package only
+1. **Mainnet only** — the Ark server, chain source, and network are fixed to Second's hosted mainnet endpoints. Signet / regtest are not selectable.
+2. **No StartOS config form** — the hosted endpoints are baked into the image, not editable from the StartOS UI.
+3. **Requires internet** — Ark rounds and chain data come from `ark.second.tech` and `mempool.second.tech`.
 
 ---
 
 ## What Is Unchanged from Upstream
 
-The service is identical to upstream. There are no modifications.
+The `bark-web` UI and `barkd` daemon behave exactly as upstream documents — wallet creation, restore-from-seed, send/receive across Lightning/Ark/on-chain, background refreshes, and unilateral exit. Only the deployment (single StartOS service, hosted endpoints, Tor/LAN access) differs.
 
 ---
 
 ## Quick Reference for AI Consumers
 
 ```yaml
-package_id: hello-world
-image: ghcr.io/start9labs/hello-world
-architectures: [x86_64, aarch64, riscv64]
+package_id: bark-web
+image: custom (bark.Dockerfile)
+architectures: [x86_64, aarch64]
 volumes:
   main: /data
 ports:
-  ui: 80
+  ui: 8080
+  barkd: 4000   # localhost only, not exposed
+  api: 4001     # localhost only, not exposed
 dependencies: none
-startos_managed_env_vars: none
+startos_managed_env_vars:
+  - PORT
+  - WALLET_DIR
+  - BARKD_URL
+  - ARK_SERVER
+  - CHAIN_SOURCE
+  - BARK_NETWORK
 actions: none
 ```

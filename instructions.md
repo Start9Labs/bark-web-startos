@@ -1,25 +1,34 @@
-# Hello World
+# Bark Wallet
 
-You've installed Hello World — there's nothing to configure and nothing to set up. This page covers how to open the page it serves and where to read more. (If you're a developer, Hello World is also the recommended packaging template.)
+This package runs Bark on Bitcoin **mainnet**, connected to Second's hosted Ark server. Funds are real bitcoin — back up your recovery phrase before you deposit.
 
 ## Documentation
 
-- [Hello World upstream docs](https://github.com/Start9Labs/hello-world/blob/master/README.md) — the README for the web server this package runs.
-- [StartOS Packaging Guide](https://docs.start9.com/packaging) — how to build a StartOS service package from that template.
+- [Bark documentation](https://docs.second.tech) — the upstream guide to the Ark protocol and the Bark wallet.
 
 ## What you get on StartOS
 
-- **A running web server** that serves a single static page.
-- **Nothing to configure and no actions** — the service starts on its own and is immediately usable.
+- A self-custodial Ark wallet with a web interface, reachable over Tor and LAN.
+- The `barkd` wallet daemon and its bearer token stay on your server; the token never reaches your browser.
+- Mainnet endpoints are pre-configured: Ark server `ark.second.tech`, chain source `mempool.second.tech`. There is no configuration screen to fill in.
 
 ## Getting set up
 
-There's no setup wizard, no admin password, no first-run prompt — Hello World is usable the moment it starts. To view the page it serves:
+1. Open the **Web UI** interface from the service's **Dashboard** tab.
+2. Choose **Create wallet** to generate a fresh twelve-word recovery phrase, or **Restore** to import an existing seed.
+3. Write the recovery phrase down and store it safely. If your server is lost, the seed is the only way to recover funds.
+4. Fund the wallet by receiving an on-chain deposit or an Ark payment.
 
-1. Open Hello World's **Dashboard** tab.
-2. Click the **Web UI** interface to open the served page in your browser.
+## Using Bark Wallet
+
+### Web interface
+
+The web UI is the whole experience: check your balance, send and receive across Lightning, Ark, and on-chain, and trigger an emergency on-chain exit if you ever need to move funds without the Ark server. Ark balances are refreshed automatically in the background.
+
+### Backups
+
+A StartOS backup captures the entire wallet directory, so restoring a backup returns the wallet exactly as it was. If you only have the recovery phrase, install Bark, choose **Restore**, and re-enter the words — balances rebuild from the Ark server.
 
 ## Limitations
 
-- Hello World is intentionally minimal. It is not a useful service on its own; it exists to demonstrate the StartOS packaging system.
-- The page content is static and cannot be customized through the StartOS UI.
+- Mainnet only. The Ark server, chain source, and network are fixed; signet and regtest are not selectable from the StartOS UI.

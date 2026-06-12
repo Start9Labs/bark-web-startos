@@ -10,7 +10,7 @@ export const setInterfaces = sdk.setupInterfaces(async ({ effects }) => {
   const ui = sdk.createInterface(effects, {
     name: i18n('Web UI'),
     id: 'ui',
-    description: i18n('The web interface of Hello World'),
+    description: i18n('The Bark Wallet web interface'),
     type: 'ui',
     masked: false,
     schemeOverride: null,

@@ -1,13 +1,17 @@
 import { IMPOSSIBLE, VersionInfo } from '@start9labs/start-sdk'
 
 export const current = VersionInfo.of({
-  version: '2.0.0:7',
+  version: '0.2.3:0',
   releaseNotes: {
-    en_US: 'Bumps start-sdk → 1.5.3.',
-    es_ES: 'Actualiza start-sdk → 1.5.3.',
-    de_DE: 'Aktualisiert start-sdk → 1.5.3.',
-    pl_PL: 'Aktualizuje start-sdk → 1.5.3.',
-    fr_FR: 'Met à jour start-sdk → 1.5.3.',
+    en_US: 'Initial Start9 release. Self-custodial Ark wallet for Bitcoin mainnet.',
+    es_ES:
+      'Versión inicial de Start9. Monedero Ark autocustodial para la red principal de Bitcoin.',
+    de_DE:
+      'Erste Start9-Veröffentlichung. Selbstverwahrendes Ark-Wallet für das Bitcoin-Mainnet.',
+    pl_PL:
+      'Pierwsze wydanie Start9. Samodzielny portfel Ark dla sieci głównej Bitcoin.',
+    fr_FR:
+      'Première version Start9. Portefeuille Ark auto-hébergé pour le réseau principal Bitcoin.',
   },
   migrations: {
     up: async ({ effects }) => {},
