@@ -10,8 +10,7 @@ export default {
     5: 'La interfaz web de Bark Wallet',
     6: 'Establecer contraseña de la interfaz',
     7: 'Genera una nueva contraseña para iniciar sesión en la interfaz web de Bark Wallet. El nombre de usuario siempre es «admin».',
-    8: 'Esto reemplaza cualquier contraseña existente. Actualiza tus credenciales guardadas después de ejecutarlo.',
-    9: 'Genera una contraseña para iniciar sesión en la interfaz web de Bark Wallet',
+    8: 'Genera una contraseña para iniciar sesión en la interfaz web de Bark Wallet',
   },
   de_DE: {
     0: 'Starte Bark Wallet!',
@@ -22,8 +21,7 @@ export default {
     5: 'Die Weboberfläche von Bark Wallet',
     6: 'UI-Passwort festlegen',
     7: 'Generiert ein neues Passwort für die Anmeldung an der Weboberfläche von Bark Wallet. Der Benutzername ist immer „admin“.',
-    8: 'Dies ersetzt jedes vorhandene Passwort. Aktualisiere danach deine gespeicherten Zugangsdaten.',
-    9: 'Generiere ein Passwort für die Anmeldung an der Weboberfläche von Bark Wallet',
+    8: 'Generiere ein Passwort für die Anmeldung an der Weboberfläche von Bark Wallet',
   },
   pl_PL: {
     0: 'Uruchamianie Bark Wallet!',
@@ -34,8 +32,7 @@ export default {
     5: 'Interfejs webowy Bark Wallet',
     6: 'Ustaw hasło interfejsu',
     7: 'Generuje nowe hasło do logowania w interfejsie webowym Bark Wallet. Nazwa użytkownika to zawsze „admin”.',
-    8: 'Zastępuje to dotychczasowe hasło. Po wykonaniu zaktualizuj zapisane dane logowania.',
-    9: 'Wygeneruj hasło do logowania w interfejsie webowym Bark Wallet',
+    8: 'Wygeneruj hasło do logowania w interfejsie webowym Bark Wallet',
   },
   fr_FR: {
     0: 'Démarrage de Bark Wallet !',
@@ -46,7 +43,6 @@ export default {
     5: "L'interface web de Bark Wallet",
     6: "Définir le mot de passe de l'interface",
     7: "Génère un nouveau mot de passe pour se connecter à l'interface web de Bark Wallet. Le nom d'utilisateur est toujours « admin ».",
-    8: 'Cela remplace tout mot de passe existant. Mettez à jour vos identifiants enregistrés après exécution.',
-    9: "Génère un mot de passe pour se connecter à l'interface web de Bark Wallet",
+    8: "Génère un mot de passe pour se connecter à l'interface web de Bark Wallet",
   },
 } satisfies Record<string, LangDict>

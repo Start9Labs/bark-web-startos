@@ -15,8 +15,7 @@ const dict = {
   'Set UI Password': 6,
   'Generate a new password for logging in to the Bark Wallet web interface. The username is always "admin".':
     7,
-  'This replaces any existing password. Update saved logins after running it.': 8,
-  'Generate a password to log in to the Bark Wallet web interface': 9,
+  'Generate a password to log in to the Bark Wallet web interface': 8,
 } as const
 
 /**
