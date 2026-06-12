@@ -159,7 +159,7 @@ The `bark-web` UI and `barkd` daemon behave exactly as upstream documents — wa
 ## Quick Reference for AI Consumers
 
 ```yaml
-package_id: bark-wallet
+package_id: bark-web
 image: custom (bark.Dockerfile)
 architectures: [x86_64, aarch64]
 volumes:
