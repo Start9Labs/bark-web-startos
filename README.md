@@ -55,7 +55,7 @@ The `barkd` binary is fetched from the upstream GitLab release with a pinned SHA
 
 | Volume | Mount Point | Purpose                  |
 | ------ | ----------- | ------------------------ |
-| `main` | `/data`     | Wallet data (`/data/.bark`) |
+| `main` | `/data`     | Wallet data (`/data/.bark`), package store (`/data/store.json`) |
 
 Everything the wallet persists lives under `/data/.bark`:
 
@@ -63,11 +63,15 @@ Everything the wallet persists lives under `/data/.bark`:
 - `mnemonic` — seed
 - `auth_token` — barkd bearer token (never reaches the browser)
 
+`/data/store.json` holds StartOS-managed state separate from the wallet — currently the `uiPassword` enforced by the reverse-proxy basic-auth gate.
+
 ---
 
 ## Installation and First-Run Flow
 
-A `mkdir -p /data/.bark` oneshot runs before `barkd` starts on every launch. On first run the wallet is empty — the user creates or restores a wallet through the web UI. No StartOS-managed credentials are generated.
+A `mkdir -p /data/.bark` oneshot runs before `barkd` starts on every launch. On first run the wallet is empty — the user creates or restores a wallet through the web UI.
+
+The web interface is gated by HTTP basic auth enforced at the StartOS reverse proxy (username `admin`). On init, a critical **Set UI Password** task is created whenever `store.json` has no `uiPassword`, so a fresh install cannot serve the wallet until the user generates a password.
 
 ---
 
@@ -89,6 +93,8 @@ These three values are passed to the API daemon as environment variables (`ARK_S
 | --------- | ---- | -------- | ------------------- |
 | Web UI    | 8080 | HTTP     | Bark Wallet web app |
 
+The OS reverse proxy terminates TLS and enforces HTTP basic auth (username `admin`, password from `store.json`) before forwarding to nginx. Unauthenticated requests get `401`.
+
 **Access methods:**
 
 - LAN IP with unique port
@@ -102,7 +108,11 @@ Ports 4000 (barkd) and 4001 (api) are bound to `127.0.0.1` only and are never ex
 
 ## Actions (StartOS UI)
 
-None.
+| Action            | ID                | Purpose                                                                 |
+| ----------------- | ----------------- | ---------------------------------------------------------------------- |
+| Set UI Password   | `set-ui-password` | Generate a new random password for the web UI login (username `admin`) |
+
+Created as a critical task on first install (and any time `uiPassword` is missing); also runnable on demand to rotate the password.
 
 ---
 
@@ -153,9 +163,9 @@ package_id: bark-web
 image: custom (bark.Dockerfile)
 architectures: [x86_64, aarch64]
 volumes:
-  main: /data
+  main: /data   # wallet at /data/.bark, package store at /data/store.json
 ports:
-  ui: 8080
+  ui: 8080      # basic-auth gated at the OS reverse proxy (user: admin)
   barkd: 4000   # localhost only, not exposed
   api: 4001     # localhost only, not exposed
 dependencies: none
@@ -166,5 +176,6 @@ startos_managed_env_vars:
   - ARK_SERVER
   - CHAIN_SOURCE
   - BARK_NETWORK
-actions: none
+actions:
+  - set-ui-password   # generate/rotate the web UI password (basic auth, user: admin)
 ```
