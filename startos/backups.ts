@@ -22,6 +22,7 @@ export const { createBackup, restoreInit } = sdk.setupBackups(
           '.bark/db.sqlite-wal',
           '.bark/db.sqlite-shm',
           '.bark/.backup-state.json',
+          '.bark/ui_session_secret',
         ],
       })
       .setPostRestore(async (effects) => {

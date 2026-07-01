@@ -1,53 +1,18 @@
 import { IMPOSSIBLE, VersionInfo } from '@start9labs/start-sdk'
 
 export const current = VersionInfo.of({
-  version: '0.3.0:0',
+  version: '0.3.1:0',
   releaseNotes: {
-    en_US: `Updated Bark to 0.3.0 (wallet daemon and web GUI).
-
-- Unilateral exits no longer lock a VTXO until the exit transaction is actually broadcast, so queued funds stay spendable and the exit cancels itself cleanly if they are spent elsewhere.
-- Automatic detection and recovery of force-exited VTXOs during sync; Lightning-received VTXOs are now protected from force-exit.
-- Adds LNURL-pay support, plus GUI additions: a dedicated VTXO page, a fiat/bitcoin unit toggle on amount entry, and barkd log export.
-
-⚠️ Do not upgrade if you have an in-progress emergency exit on mainnet — finish it first.
-
-Full notes: https://gitlab.com/ark-bitcoin/bark/-/releases/bark-0.3.0`,
-    es_ES: `Actualiza Bark a 0.3.0 (demonio del monedero e interfaz web).
-
-- Las salidas unilaterales ya no bloquean un VTXO hasta que la transacción de salida se transmite realmente, así que los fondos en cola siguen siendo gastables y la salida se cancela sola si se gastan en otro lugar.
-- Detección y recuperación automática de VTXO con salida forzada durante la sincronización; los VTXO recibidos por Lightning ahora están protegidos contra la salida forzada.
-- Añade soporte de LNURL-pay, además de mejoras en la interfaz: una página dedicada de VTXO, alternancia entre unidad fiat/bitcoin al introducir importes y exportación de registros de barkd.
-
-⚠️ No actualices si tienes una salida de emergencia en curso en mainnet — termínala primero.
-
-Notas completas: https://gitlab.com/ark-bitcoin/bark/-/releases/bark-0.3.0`,
-    de_DE: `Aktualisiert Bark auf 0.3.0 (Wallet-Daemon und Web-Oberfläche).
-
-- Einseitige Exits sperren ein VTXO nicht mehr, bis die Exit-Transaktion tatsächlich gesendet wurde; in der Warteschlange stehende Mittel bleiben verfügbar, und der Exit bricht sauber ab, wenn sie anderweitig ausgegeben werden.
-- Automatische Erkennung und Wiederherstellung zwangsweise ausgetretener VTXOs bei der Synchronisierung; über Lightning empfangene VTXOs sind nun vor Zwangsexit geschützt.
-- Fügt LNURL-pay-Unterstützung hinzu sowie Oberflächen-Erweiterungen: eine eigene VTXO-Seite, das Umschalten zwischen Fiat- und Bitcoin-Einheit bei der Betragseingabe und den Export der barkd-Protokolle.
-
-⚠️ Nicht aktualisieren, wenn ein Notfall-Exit im Mainnet läuft — schließen Sie ihn zuerst ab.
-
-Vollständige Hinweise: https://gitlab.com/ark-bitcoin/bark/-/releases/bark-0.3.0`,
-    pl_PL: `Aktualizuje Bark do 0.3.0 (demon portfela i interfejs webowy).
-
-- Jednostronne wyjścia nie blokują już VTXO, dopóki transakcja wyjścia nie zostanie faktycznie rozgłoszona, więc środki w kolejce pozostają wydawalne, a wyjście samo się anuluje, jeśli zostaną wydane gdzie indziej.
-- Automatyczne wykrywanie i odzyskiwanie wymuszonych wyjść VTXO podczas synchronizacji; VTXO otrzymane przez Lightning są teraz chronione przed wymuszonym wyjściem.
-- Dodaje obsługę LNURL-pay oraz ulepszenia interfejsu: dedykowaną stronę VTXO, przełączanie jednostki fiat/bitcoin przy wpisywaniu kwoty i eksport logów barkd.
-
-⚠️ Nie aktualizuj, jeśli masz trwające awaryjne wyjście na mainnecie — najpierw je zakończ.
-
-Pełne informacje: https://gitlab.com/ark-bitcoin/bark/-/releases/bark-0.3.0`,
-    fr_FR: `Met à jour Bark vers 0.3.0 (démon du portefeuille et interface web).
-
-- Les sorties unilatérales ne verrouillent plus un VTXO tant que la transaction de sortie n'est pas réellement diffusée ; les fonds en file d'attente restent dépensables et la sortie s'annule proprement s'ils sont dépensés ailleurs.
-- Détection et récupération automatiques des VTXO sortis de force lors de la synchronisation ; les VTXO reçus via Lightning sont désormais protégés contre la sortie forcée.
-- Ajoute la prise en charge de LNURL-pay, ainsi que des améliorations de l'interface : une page VTXO dédiée, un basculement entre unité fiat et bitcoin lors de la saisie du montant, et l'export des journaux de barkd.
-
-⚠️ Ne mettez pas à jour si une sortie d'urgence est en cours sur le mainnet — terminez-la d'abord.
-
-Notes complètes : https://gitlab.com/ark-bitcoin/bark/-/releases/bark-0.3.0`,
+    en_US:
+      'Replaces the browser login popup with a native in-app login page and updates bark-web to v0.3.1 (barkd 0.3.0). Your existing UI password still works — you now enter it on the wallet\'s own page. Set or change it under Actions → Set UI Password.',
+    es_ES:
+      'Reemplaza la ventana emergente de acceso del navegador por una página de inicio de sesión nativa en la app y actualiza bark-web a v0.3.1 (barkd 0.3.0). Tu contraseña de la interfaz sigue funcionando: ahora la introduces en la propia página del monedero. Configúrala o cámbiala en Acciones → Establecer contraseña de la interfaz.',
+    de_DE:
+      'Ersetzt das Browser-Anmelde-Popup durch eine native In-App-Anmeldeseite und aktualisiert bark-web auf v0.3.1 (barkd 0.3.0). Ihr bestehendes UI-Passwort funktioniert weiterhin – Sie geben es nun auf der eigenen Seite der Wallet ein. Festlegen oder ändern unter Aktionen → UI-Passwort festlegen.',
+    pl_PL:
+      'Zastępuje wyskakujące okno logowania przeglądarki natywną stroną logowania w aplikacji i aktualizuje bark-web do v0.3.1 (barkd 0.3.0). Twoje dotychczasowe hasło interfejsu nadal działa — teraz wpisujesz je na własnej stronie portfela. Ustaw je lub zmień w Akcje → Ustaw hasło interfejsu.',
+    fr_FR:
+      'Remplace la fenêtre de connexion du navigateur par une page de connexion native intégrée à l\'application et met à jour bark-web vers v0.3.1 (barkd 0.3.0). Votre mot de passe d\'interface existant fonctionne toujours — vous le saisissez désormais sur la page du portefeuille. Définissez-le ou modifiez-le dans Actions → Définir le mot de passe de l\'interface.',
   },
   migrations: {
     up: async ({ effects }) => {},

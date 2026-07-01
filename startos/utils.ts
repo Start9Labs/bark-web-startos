@@ -2,11 +2,11 @@ export const uiPort = 8080
 export const apiPort = 4001
 export const barkdPort = 4000
 
-export const uiUsername = 'admin'
-
 export const walletDir = '/data/.bark'
 // Display-only path shown in the wallet's backup-reminder UI; must match walletDir.
 export const walletDataPath = `${walletDir}/`
+// UI password materialized from store.json for the API's UI_PASSWORD_FILE gate.
+export const uiPasswordFile = `${walletDir}/ui_password`
 
 // Continuous-backup paths. The shell agent (backup-agent.sh) hardcodes the
 // matching absolute paths — keep the two in sync.

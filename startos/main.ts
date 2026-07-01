@@ -1,5 +1,6 @@
 import { backupConfigJson } from './fileModels/backupConfig.json'
 import { backupStateJson } from './fileModels/backupState.json'
+import { storeJson } from './fileModels/store.json'
 import { i18n } from './i18n'
 import { sdk } from './sdk'
 import {
@@ -9,6 +10,7 @@ import {
   barkdPort,
   barkNetwork,
   chainSource,
+  uiPasswordFile,
   uiPort,
   walletDataPath,
   walletDir,
@@ -23,6 +25,8 @@ function ago(seconds: number): string {
 
 export const main = sdk.setupMain(async ({ effects }) => {
   console.info(i18n('Starting Bark Wallet!'))
+
+  await storeJson.read((s) => s?.uiPassword).const(effects)
 
   const mounts = sdk.Mounts.of().mountVolume({
     volumeId: 'main',
@@ -43,6 +47,20 @@ export const main = sdk.setupMain(async ({ effects }) => {
       subcontainer: barkdSub,
       exec: { command: ['mkdir', '-p', walletDir] },
       requires: [],
+    })
+    .addOneshot('write-ui-password', {
+      // Materialize the UI password from store.json into a mode-600 file the API
+      // reads (UI_PASSWORD_FILE). jq reads/writes files directly so the secret
+      // never appears in process args; umask 077 makes the file owner-only.
+      subcontainer: barkdSub,
+      exec: {
+        command: [
+          'sh',
+          '-c',
+          `umask 077 && jq -r '.uiPassword // ""' /data/store.json > ${uiPasswordFile}`,
+        ],
+      },
+      requires: ['init-data'],
     })
     .addOneshot('restore-pull', {
       // On a restore (pendingRestore flag), fetch + decrypt the latest external
@@ -86,12 +104,15 @@ export const main = sdk.setupMain(async ({ effects }) => {
         command: ['sh', '-c', 'cd /app/api && exec node dist/index.js'],
         env: {
           PORT: String(apiPort),
+          HOST: '127.0.0.1',
           WALLET_DIR: walletDir,
           WALLET_DATA_PATH: walletDataPath,
           BARKD_URL: `http://127.0.0.1:${barkdPort}`,
           ARK_SERVER: arkServer,
           CHAIN_SOURCE: chainSource,
           BARK_NETWORK: barkNetwork,
+          UI_AUTH: 'true',
+          UI_PASSWORD_FILE: uiPasswordFile,
         },
       },
       ready: {
@@ -102,7 +123,7 @@ export const main = sdk.setupMain(async ({ effects }) => {
             errorMessage: 'The API is starting',
           }),
       },
-      requires: ['barkd'],
+      requires: ['barkd', 'write-ui-password'],
     })
     .addDaemon('nginx', {
       subcontainer: await sdk.SubContainer.of(
