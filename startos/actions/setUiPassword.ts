@@ -1,5 +1,5 @@
 import { utils } from '@start9labs/start-sdk'
-import { storeJson } from '../fileModels/store.json'
+import { uiPasswordFile } from '../fileModels/uiPassword'
 import { i18n } from '../i18n'
 import { sdk } from '../sdk'
 
@@ -23,7 +23,8 @@ export const setUiPassword = sdk.Action.withoutInput(
       len: 32,
     })
 
-    await storeJson.merge(effects, { uiPassword: password })
+    // Write the canonical password file the API reads directly — no store.
+    await uiPasswordFile.write(effects, password)
 
     return {
       version: '1',

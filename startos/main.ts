@@ -1,6 +1,6 @@
 import { backupConfigJson } from './fileModels/backupConfig.json'
 import { backupStateJson } from './fileModels/backupState.json'
-import { storeJson } from './fileModels/store.json'
+import { uiPasswordFile } from './fileModels/uiPassword'
 import { i18n } from './i18n'
 import { sdk } from './sdk'
 import {
@@ -10,8 +10,8 @@ import {
   barkdPort,
   barkNetwork,
   chainSource,
-  uiPasswordFile,
-  uiSessionSecretFile,
+  uiPasswordPath,
+  uiSessionSecretPath,
   uiPort,
   walletDataPath,
   walletDir,
@@ -27,7 +27,9 @@ function ago(seconds: number): string {
 export const main = sdk.setupMain(async ({ effects }) => {
   console.info(i18n('Starting Bark Wallet!'))
 
-  await storeJson.read((s) => s?.uiPassword).const(effects)
+  // Re-run (restarting the API) whenever the UI password changes, so a rotate
+  // takes effect and drops existing sessions.
+  await uiPasswordFile.read().const(effects)
 
   const mounts = sdk.Mounts.of().mountVolume({
     volumeId: 'main',
@@ -48,23 +50,6 @@ export const main = sdk.setupMain(async ({ effects }) => {
       subcontainer: barkdSub,
       exec: { command: ['mkdir', '-p', walletDir] },
       requires: [],
-    })
-    .addOneshot('write-ui-password', {
-      // Materialize the UI password from store.json into a mode-600 file the API
-      // reads (UI_PASSWORD_FILE), at the volume root — NOT in barkd's datadir.
-      // jq reads/writes files directly so the secret never appears in process
-      // args; umask 077 makes the file owner-only. Also sweep any stale UI-auth
-      // files a previous build wrote inside the datadir, which would otherwise
-      // make barkd reject wallet creation ("Datadir has unexpected contents").
-      subcontainer: barkdSub,
-      exec: {
-        command: [
-          'sh',
-          '-c',
-          `umask 077 && jq -r '.uiPassword // ""' /data/store.json > ${uiPasswordFile} && rm -f ${walletDir}/ui_password ${walletDir}/ui_session_secret`,
-        ],
-      },
-      requires: ['init-data'],
     })
     .addOneshot('restore-pull', {
       // On a restore (pendingRestore flag), fetch + decrypt the latest external
@@ -116,8 +101,8 @@ export const main = sdk.setupMain(async ({ effects }) => {
           CHAIN_SOURCE: chainSource,
           BARK_NETWORK: barkNetwork,
           UI_AUTH: 'true',
-          UI_PASSWORD_FILE: uiPasswordFile,
-          UI_SESSION_SECRET_FILE: uiSessionSecretFile,
+          UI_PASSWORD_FILE: uiPasswordPath,
+          UI_SESSION_SECRET_FILE: uiSessionSecretPath,
         },
       },
       ready: {
@@ -128,7 +113,7 @@ export const main = sdk.setupMain(async ({ effects }) => {
             errorMessage: 'The API is starting',
           }),
       },
-      requires: ['barkd', 'write-ui-password'],
+      requires: ['barkd'],
     })
     .addDaemon('nginx', {
       subcontainer: await sdk.SubContainer.of(

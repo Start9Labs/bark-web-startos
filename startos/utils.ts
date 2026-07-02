@@ -8,9 +8,10 @@ export const walletDataPath = `${walletDir}/`
 // UI-auth files live at the volume ROOT, not inside walletDir. barkd treats its
 // datadir (/data/.bark) as wallet-owned and aborts wallet creation if it finds
 // any unrecognized file there ("Datadir has unexpected contents"). Keeping these
-// under /data (a sibling of .bark) leaves the datadir clean for barkd.
-export const uiPasswordFile = `/data/ui_password`
-export const uiSessionSecretFile = `/data/ui_session_secret`
+// under /data (a sibling of .bark) leaves the datadir clean for barkd. The
+// password path must match the uiPasswordFile file model's subpath.
+export const uiPasswordPath = `/data/ui_password`
+export const uiSessionSecretPath = `/data/ui_session_secret`
 
 // Continuous-backup paths. The shell agent (backup-agent.sh) hardcodes the
 // matching absolute paths — keep the two in sync.
