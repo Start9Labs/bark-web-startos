@@ -1,5 +1,6 @@
 import { backupConfigJson } from './fileModels/backupConfig.json'
 import { backupStateJson } from './fileModels/backupState.json'
+import { uiPasswordFile } from './fileModels/uiPassword'
 import { i18n } from './i18n'
 import { sdk } from './sdk'
 import {
@@ -9,6 +10,8 @@ import {
   barkdPort,
   barkNetwork,
   chainSource,
+  uiPasswordPath,
+  uiSessionSecretPath,
   uiPort,
   walletDataPath,
   walletDir,
@@ -23,6 +26,10 @@ function ago(seconds: number): string {
 
 export const main = sdk.setupMain(async ({ effects }) => {
   console.info(i18n('Starting Bark Wallet!'))
+
+  // Re-run (restarting the API) whenever the UI password changes, so a rotate
+  // takes effect and drops existing sessions.
+  await uiPasswordFile.read().const(effects)
 
   const mounts = sdk.Mounts.of().mountVolume({
     volumeId: 'main',
@@ -86,12 +93,16 @@ export const main = sdk.setupMain(async ({ effects }) => {
         command: ['sh', '-c', 'cd /app/api && exec node dist/index.js'],
         env: {
           PORT: String(apiPort),
+          HOST: '127.0.0.1',
           WALLET_DIR: walletDir,
           WALLET_DATA_PATH: walletDataPath,
           BARKD_URL: `http://127.0.0.1:${barkdPort}`,
           ARK_SERVER: arkServer,
           CHAIN_SOURCE: chainSource,
           BARK_NETWORK: barkNetwork,
+          UI_AUTH: 'true',
+          UI_PASSWORD_FILE: uiPasswordPath,
+          UI_SESSION_SECRET_FILE: uiSessionSecretPath,
         },
       },
       ready: {
