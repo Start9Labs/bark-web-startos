@@ -1,56 +1,44 @@
 import { IMPOSSIBLE, VersionInfo } from '@start9labs/start-sdk'
+import { migrateBackupConfigV1 } from './migrateBackupV1'
 
 export const current = VersionInfo.of({
-  version: '0.3.0:0',
+  version: '0.3.0:1',
   releaseNotes: {
-    en_US: `Updated Bark to 0.3.0 (wallet daemon and web GUI).
-
-- Unilateral exits no longer lock a VTXO until the exit transaction is actually broadcast, so queued funds stay spendable and the exit cancels itself cleanly if they are spent elsewhere.
-- Automatic detection and recovery of force-exited VTXOs during sync; Lightning-received VTXOs are now protected from force-exit.
-- Adds LNURL-pay support, plus GUI additions: a dedicated VTXO page, a fiat/bitcoin unit toggle on amount entry, and barkd log export.
-
-⚠️ Do not upgrade if you have an in-progress emergency exit on mainnet — finish it first.
-
-Full notes: https://gitlab.com/ark-bitcoin/bark/-/releases/bark-0.3.0`,
-    es_ES: `Actualiza Bark a 0.3.0 (demonio del monedero e interfaz web).
-
-- Las salidas unilaterales ya no bloquean un VTXO hasta que la transacción de salida se transmite realmente, así que los fondos en cola siguen siendo gastables y la salida se cancela sola si se gastan en otro lugar.
-- Detección y recuperación automática de VTXO con salida forzada durante la sincronización; los VTXO recibidos por Lightning ahora están protegidos contra la salida forzada.
-- Añade soporte de LNURL-pay, además de mejoras en la interfaz: una página dedicada de VTXO, alternancia entre unidad fiat/bitcoin al introducir importes y exportación de registros de barkd.
-
-⚠️ No actualices si tienes una salida de emergencia en curso en mainnet — termínala primero.
-
-Notas completas: https://gitlab.com/ark-bitcoin/bark/-/releases/bark-0.3.0`,
-    de_DE: `Aktualisiert Bark auf 0.3.0 (Wallet-Daemon und Web-Oberfläche).
-
-- Einseitige Exits sperren ein VTXO nicht mehr, bis die Exit-Transaktion tatsächlich gesendet wurde; in der Warteschlange stehende Mittel bleiben verfügbar, und der Exit bricht sauber ab, wenn sie anderweitig ausgegeben werden.
-- Automatische Erkennung und Wiederherstellung zwangsweise ausgetretener VTXOs bei der Synchronisierung; über Lightning empfangene VTXOs sind nun vor Zwangsexit geschützt.
-- Fügt LNURL-pay-Unterstützung hinzu sowie Oberflächen-Erweiterungen: eine eigene VTXO-Seite, das Umschalten zwischen Fiat- und Bitcoin-Einheit bei der Betragseingabe und den Export der barkd-Protokolle.
-
-⚠️ Nicht aktualisieren, wenn ein Notfall-Exit im Mainnet läuft — schließen Sie ihn zuerst ab.
-
-Vollständige Hinweise: https://gitlab.com/ark-bitcoin/bark/-/releases/bark-0.3.0`,
-    pl_PL: `Aktualizuje Bark do 0.3.0 (demon portfela i interfejs webowy).
-
-- Jednostronne wyjścia nie blokują już VTXO, dopóki transakcja wyjścia nie zostanie faktycznie rozgłoszona, więc środki w kolejce pozostają wydawalne, a wyjście samo się anuluje, jeśli zostaną wydane gdzie indziej.
-- Automatyczne wykrywanie i odzyskiwanie wymuszonych wyjść VTXO podczas synchronizacji; VTXO otrzymane przez Lightning są teraz chronione przed wymuszonym wyjściem.
-- Dodaje obsługę LNURL-pay oraz ulepszenia interfejsu: dedykowaną stronę VTXO, przełączanie jednostki fiat/bitcoin przy wpisywaniu kwoty i eksport logów barkd.
-
-⚠️ Nie aktualizuj, jeśli masz trwające awaryjne wyjście na mainnecie — najpierw je zakończ.
-
-Pełne informacje: https://gitlab.com/ark-bitcoin/bark/-/releases/bark-0.3.0`,
-    fr_FR: `Met à jour Bark vers 0.3.0 (démon du portefeuille et interface web).
-
-- Les sorties unilatérales ne verrouillent plus un VTXO tant que la transaction de sortie n'est pas réellement diffusée ; les fonds en file d'attente restent dépensables et la sortie s'annule proprement s'ils sont dépensés ailleurs.
-- Détection et récupération automatiques des VTXO sortis de force lors de la synchronisation ; les VTXO reçus via Lightning sont désormais protégés contre la sortie forcée.
-- Ajoute la prise en charge de LNURL-pay, ainsi que des améliorations de l'interface : une page VTXO dédiée, un basculement entre unité fiat et bitcoin lors de la saisie du montant, et l'export des journaux de barkd.
-
-⚠️ Ne mettez pas à jour si une sortie d'urgence est en cours sur le mainnet — terminez-la d'abord.
-
-Notes complètes : https://gitlab.com/ark-bitcoin/bark/-/releases/bark-0.3.0`,
+    en_US: `Internal updates (start-sdk 2.0.x), plus external wallet-backup improvements:
+• Dropbox setup now gives the same guided browser link as Google Drive; authorization codes no longer need hand-editing.
+• Nextcloud can back up to a LAN server with a self-signed certificate.
+• SFTP targets that rejected setting file timestamps now upload correctly.
+• The Wallet Backup health check names the failing target and reason, and no longer floods the logs.
+• Entered target settings are saved even before you toggle Enabled, and passwords persist reliably across saves.`,
+    es_ES: `Actualizaciones internas (start-sdk 2.0.x), además de mejoras en las copias de seguridad externas del monedero:
+• La configuración de Dropbox ahora ofrece el mismo enlace guiado en el navegador que Google Drive; los códigos de autorización ya no necesitan edición manual.
+• Nextcloud puede hacer copias en un servidor de la red local con certificado autofirmado.
+• Los destinos SFTP que rechazaban fijar la fecha de los archivos ahora suben correctamente.
+• La comprobación de estado «Copia del monedero» indica el destino y el motivo del fallo, y ya no satura los registros.
+• Los ajustes introducidos se guardan aunque no hayas activado «Habilitado», y las contraseñas se conservan de forma fiable al guardar.`,
+    de_DE: `Interne Aktualisierungen (start-sdk 2.0.x) sowie Verbesserungen der externen Wallet-Backups:
+• Die Dropbox-Einrichtung bietet jetzt denselben geführten Browser-Link wie Google Drive; Autorisierungscodes müssen nicht mehr von Hand bearbeitet werden.
+• Nextcloud kann auf einen LAN-Server mit selbstsigniertem Zertifikat sichern.
+• SFTP-Ziele, die das Setzen des Datei-Zeitstempels ablehnten, laden nun korrekt hoch.
+• Die Zustandsprüfung „Wallet-Backup“ nennt Ziel und Grund des Fehlers und flutet die Logs nicht mehr.
+• Eingegebene Zieleinstellungen werden auch vor dem Aktivieren gespeichert, und Passwörter bleiben beim Speichern zuverlässig erhalten.`,
+    pl_PL: `Aktualizacje wewnętrzne (start-sdk 2.0.x) oraz ulepszenia zewnętrznych kopii zapasowych portfela:
+• Konfiguracja Dropbox udostępnia teraz taki sam prowadzony link w przeglądarce jak Google Drive; kody autoryzacji nie wymagają już ręcznej edycji.
+• Nextcloud może tworzyć kopie na serwerze w sieci lokalnej z certyfikatem samopodpisanym.
+• Cele SFTP, które odrzucały ustawianie znacznika czasu plików, teraz przesyłają poprawnie.
+• Kontrola stanu „Kopia portfela“ podaje cel i przyczynę błędu i nie zalewa już logów.
+• Wprowadzone ustawienia celu są zapisywane nawet przed włączeniem „Włączone“, a hasła są niezawodnie zachowywane przy zapisie.`,
+    fr_FR: `Mises à jour internes (start-sdk 2.0.x), ainsi que des améliorations des sauvegardes externes du portefeuille :
+• La configuration de Dropbox propose désormais le même lien guidé dans le navigateur que Google Drive ; les codes d'autorisation n'ont plus besoin d'être modifiés à la main.
+• Nextcloud peut sauvegarder vers un serveur du réseau local avec un certificat auto-signé.
+• Les cibles SFTP qui refusaient de définir l'horodatage des fichiers téléversent maintenant correctement.
+• Le contrôle d'état « Sauvegarde du portefeuille » indique la cible et la raison de l'échec et n'inonde plus les journaux.
+• Les paramètres saisis sont enregistrés même avant d'activer « Activé », et les mots de passe sont conservés de façon fiable à l'enregistrement.`,
   },
   migrations: {
-    up: async ({ effects }) => {},
+    up: async ({ effects }) => {
+      await migrateBackupConfigV1(effects)
+    },
     down: IMPOSSIBLE,
   },
 })

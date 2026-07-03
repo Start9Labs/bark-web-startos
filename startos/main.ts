@@ -31,7 +31,7 @@ export const main = sdk.setupMain(async ({ effects }) => {
     readonly: false,
   })
 
-  const barkdSub = await sdk.SubContainer.of(
+  const barkdSub = sdk.SubContainer.of(
     effects,
     { imageId: 'bark' },
     mounts,
@@ -76,7 +76,7 @@ export const main = sdk.setupMain(async ({ effects }) => {
       requires: ['restore-pull'],
     })
     .addDaemon('api', {
-      subcontainer: await sdk.SubContainer.of(
+      subcontainer: sdk.SubContainer.of(
         effects,
         { imageId: 'bark' },
         mounts,
@@ -105,7 +105,7 @@ export const main = sdk.setupMain(async ({ effects }) => {
       requires: ['barkd'],
     })
     .addDaemon('nginx', {
-      subcontainer: await sdk.SubContainer.of(
+      subcontainer: sdk.SubContainer.of(
         effects,
         { imageId: 'bark' },
         mounts,
@@ -125,7 +125,7 @@ export const main = sdk.setupMain(async ({ effects }) => {
     .addDaemon('backup-agent', {
       // Watches db.sqlite, snapshots on change (+ a periodic backstop),
       // encrypts with a seed-derived key, and ships to the configured targets.
-      subcontainer: await sdk.SubContainer.of(
+      subcontainer: sdk.SubContainer.of(
         effects,
         { imageId: 'bark' },
         mounts,
@@ -149,7 +149,13 @@ export const main = sdk.setupMain(async ({ effects }) => {
           // A local backup always runs, but recovering it depends on a manual
           // StartOS backup, so it's likely stale when you need it. Only an
           // off-box target stays current — no external target => failing.
-          if (!cfg?.selectedRcloneRemotes?.length)
+          const anyExternal = [
+            cfg?.gdrive,
+            cfg?.dropbox,
+            cfg?.nextcloud,
+            cfg?.sftp,
+          ].some((t) => t?.enabled)
+          if (!anyExternal)
             return {
               result: 'failure',
               message:
