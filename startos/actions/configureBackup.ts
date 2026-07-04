@@ -215,16 +215,17 @@ function refreshOf(tok?: string | null): string {
   }
 }
 
-const WARNING = `Add <b>external, off-box</b> backup targets here. (A local backup always runs on this server too — see the <b>Backup Safety</b> action for how backups and encryption work and why an off-box copy matters.)
-
-<b>Use a target on a DIFFERENT machine than this server</b> — a NAS, another computer, or a third-party provider. A copy on this same box is recoverable only from a manual StartOS backup, so it's likely stale when you need it; an off-box target stays current. Toggle a target off to stop using it without losing its saved settings. Tor .onion targets are not supported yet — use clearnet addresses.
-
-Setup notes:
-• <b>SFTP</b>: point at any always-on SSH server (NAS, Raspberry Pi, VPS). Password or SSH key auth. Use a relative folder path (no leading /) to land in the home directory.
-• <b>Nextcloud</b>: create an app password under Settings → Security; use the WebDAV URL https://your.host/remote.php/dav/files/USERNAME/. For a LAN server with a self-signed certificate, turn on "Trust self-signed certificate".
-• <b>Dropbox</b>: create a Scoped/App-folder app, enable files.content.read+write, then supply App Key + App Secret and enable this target. Submit once — you'll get a Dropbox link; approve it and paste the <b>authorization code Dropbox shows you</b> (not a "Generated access token") into the Authorization Code field, then submit again.
-• <b>Google Drive</b>: create an OAuth Desktop client (Drive API enabled), then supply Client ID + Client Secret and enable this target. Submit once for a Google sign-in link; approve it, then paste the <b>code</b> from the redirected localhost URL (paste it as-is — no need to hand-edit %2F) and submit again.
-• Prefer credentials over browser flows? Paste an existing <b>Refresh Token</b> for Google/Dropbox instead of an authorization code.`
+const WARNING = `<b>⚠ A StartOS backup is what makes these restorable.</b> Your wallet database isn't inside it, but your wallet seed and the pointer to these targets are. Set StartOS backups up, and after you enable a target below take a fresh one (System → Create Backup) — one taken earlier won't know about this target, so the restore comes back stale.<br><br>
+<b>Add an external, off-box target.</b> A local on-box backup always runs too, but it survives only inside a manual StartOS backup — likely stale. Use a <b>different machine</b> (a NAS, another computer, or a provider). Toggle one off to stop using it while keeping its settings. Tor .onion targets aren't supported yet.<br><br>
+<b>After saving:</b> run <b>Back Up Now</b> to verify, then take that StartOS backup.<br><br>
+<b>Setup:</b>
+<ul>
+<li><b>SFTP</b>: point at any always-on SSH server (NAS, Raspberry Pi, VPS). Password or SSH key auth. Use a relative folder path (no leading /) to land in the home directory.</li>
+<li><b>Nextcloud</b>: create an app password under Settings → Security; use the WebDAV URL https://your.host/remote.php/dav/files/USERNAME/. For a LAN server with a self-signed certificate, turn on "Trust self-signed certificate".</li>
+<li><b>Dropbox</b>: create a Scoped/App-folder app, enable files.content.read+write, then supply App Key + App Secret and enable this target. Submit once — you'll get a Dropbox link; approve it and paste the <b>authorization code Dropbox shows you</b> (not a "Generated access token") into the Authorization Code field, then submit again.</li>
+<li><b>Google Drive</b>: create an OAuth Desktop client (Drive API enabled), then supply Client ID + Client Secret and enable this target. Submit once for a Google sign-in link; approve it, then paste the <b>code</b> from the redirected localhost URL (paste it as-is — no need to hand-edit %2F) and submit again.</li>
+<li>Prefer credentials over browser flows? Paste an existing <b>Refresh Token</b> for Google/Dropbox instead of an authorization code.</li>
+</ul>`
 
 const enabledToggle = () =>
   sdk.Value.toggle({
@@ -452,7 +453,7 @@ export const configureBackup = sdk.Action.withInput(
   async ({ effects }) => ({
     name: 'Configure Backups',
     description:
-      'Add external, off-box targets for your encrypted wallet backups (a local on-box backup always runs too, but it is recoverable only via a manual, stale-prone StartOS backup). The database is snapshotted and shipped automatically on every change. Toggle a target off to stop using it without losing its saved settings.',
+      'Add encrypted, off-box backup targets (Drive, Dropbox, Nextcloud, SFTP). A local on-box backup always runs too. Requires a StartOS backup to be restorable — take one after enabling a target. Toggle a target off to keep its settings.',
     warning: WARNING,
     allowedStatuses: 'any',
     group: 'Backups',
