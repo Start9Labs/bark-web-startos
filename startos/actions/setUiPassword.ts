@@ -1,8 +1,7 @@
 import { utils } from '@start9labs/start-sdk'
-import { storeJson } from '../fileModels/store.json'
+import { uiPasswordFile } from '../fileModels/uiPassword'
 import { i18n } from '../i18n'
 import { sdk } from '../sdk'
-import { uiUsername } from '../utils'
 
 export const setUiPassword = sdk.Action.withoutInput(
   'set-ui-password',
@@ -10,7 +9,7 @@ export const setUiPassword = sdk.Action.withoutInput(
   async ({ effects }) => ({
     name: i18n('Set UI Password'),
     description: i18n(
-      'Generate a new password for logging in to the Bark Wallet web interface. The username is always "admin".',
+      'Generate a new password for logging in to the Bark Wallet web interface. Rotating it also signs out any active sessions.',
     ),
     warning: null,
     allowedStatuses: 'any',
@@ -24,35 +23,22 @@ export const setUiPassword = sdk.Action.withoutInput(
       len: 32,
     })
 
-    await storeJson.merge(effects, { uiPassword: password })
+    // Write the canonical password file the API reads directly — no store.
+    await uiPasswordFile.write(effects, password)
 
     return {
       version: '1',
       title: 'UI Password',
       message:
-        'Use these credentials to log in to the Bark Wallet web interface in your browser.',
+        'Use this password to log in to the Bark Wallet web interface in your browser.',
       result: {
-        type: 'group',
-        value: [
-          {
-            type: 'single',
-            name: 'Username',
-            description: null,
-            value: uiUsername,
-            masked: false,
-            copyable: true,
-            qr: false,
-          },
-          {
-            type: 'single',
-            name: 'Password',
-            description: null,
-            value: password,
-            masked: true,
-            copyable: true,
-            qr: false,
-          },
-        ],
+        type: 'single',
+        name: 'Password',
+        description: null,
+        value: password,
+        masked: true,
+        copyable: true,
+        qr: false,
       },
     }
   },

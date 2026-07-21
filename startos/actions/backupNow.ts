@@ -33,7 +33,7 @@ export const backupNow = sdk.Action.withoutInput(
 
     if (res.exitCode !== 0) {
       throw new Error(
-        `Backup run failed (exit ${res.exitCode}): ${res.stderr || res.stdout}`,
+        `Backup run failed (exit ${res.exitCode}): ${String(res.stderr || res.stdout)}`,
       )
     }
 

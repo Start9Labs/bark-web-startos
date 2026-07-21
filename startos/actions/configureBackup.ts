@@ -1,4 +1,3 @@
-import * as crypto from 'crypto'
 import * as https from 'https'
 import { URLSearchParams } from 'url'
 import { backupConfigJson } from '../fileModels/backupConfig.json'
@@ -10,78 +9,14 @@ import { backupFolderDefault } from '../utils'
 // derived from the wallet mnemonic before egress — the target only ever sees
 // ciphertext.
 //
-// Each target is a top-level object with an `enabled` toggle alongside its
-// settings, so toggling a target off keeps its saved credentials.
+// This action stores each target's settings VERBATIM (plaintext) in the
+// structured backup-config.json. The backup-agent obscures passwords with
+// `rclone obscure` when it writes rclone.conf, so nothing here has to reproduce
+// or round-trip rclone's obscure format. See fileModels/backupConfig.json.ts.
 
-// External storage targets (rclone remotes). The always-on local backup is
-// handled by the agent, not configured here.
+// External storage targets. The always-on local backup is handled by the agent,
+// not configured here.
 const VALID_PROVIDERS = ['gdrive', 'dropbox', 'nextcloud', 'sftp'] as const
-
-function parseRcloneConf(conf: string): Record<string, Record<string, string>> {
-  const sections: Record<string, Record<string, string>> = {}
-  let current = ''
-  conf.split('\n').forEach((line) => {
-    line = line.trim()
-    if (line.startsWith('[') && line.endsWith(']')) {
-      current = line.slice(1, -1)
-      sections[current] = {}
-    } else if (line.includes('=') && current) {
-      const i = line.indexOf('=')
-      sections[current][line.substring(0, i).trim()] = line
-        .substring(i + 1)
-        .trim()
-    }
-  })
-  return sections
-}
-
-function removeSection(conf: string, name: string): string {
-  const lines = conf.split('\n')
-  let inSection = false
-  return lines
-    .filter((line) => {
-      const t = line.trim()
-      if (t === `[${name}]`) {
-        inSection = true
-        return false
-      }
-      if (inSection && t.startsWith('[') && t.endsWith(']')) {
-        inSection = false
-        return true
-      }
-      return !inSection
-    })
-    .join('\n')
-    .trim()
-}
-
-// rclone's standard credential obscuring (fixed public key) — required so
-// rclone can read the user's target passwords from the config. NOT secrecy;
-// the real protection is the seed-derived encryption applied to the snapshot.
-function obscure(plain: string): string {
-  const key = Buffer.from(
-    '9c935b48730a554d6bfd7c63c886a92bd390198eb8128afbf4de162b8b95f638',
-    'hex',
-  )
-  const iv = crypto.randomBytes(16)
-  const cipher = crypto.createCipheriv('aes-256-ctr', key, iv)
-  const enc = Buffer.concat([cipher.update(plain, 'utf8'), cipher.final()])
-  return Buffer.concat([iv, enc])
-    .toString('base64')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '')
-}
-
-function isObscured(value: string): boolean {
-  if (!value) return false
-  try {
-    const padded = value + '==='.slice(value.length % 4)
-    return Buffer.from(padded, 'base64').length >= 16
-  } catch {
-    return false
-  }
-}
 
 function rejectOnion(addr: string, label: string): void {
   if (addr.includes('.onion'))
@@ -116,6 +51,34 @@ function generateGoogleAuthUrl(clientId: string): string {
     access_type: 'offline',
     prompt: 'consent',
   }).toString()}`
+}
+
+// Dropbox uses the same "approve in a browser, paste the code" flow as Google.
+// No redirect_uri: Dropbox then DISPLAYS the code on-screen (so nothing has to
+// be whitelisted), and the token exchange below likewise omits redirect_uri to
+// match. token_access_type=offline is what makes Dropbox return a refresh token.
+function generateDropboxAuthUrl(clientId: string): string {
+  return `https://www.dropbox.com/oauth2/authorize?${new URLSearchParams({
+    client_id: clientId,
+    response_type: 'code',
+    token_access_type: 'offline',
+  }).toString()}`
+}
+
+// Normalize a pasted OAuth authorization code. When copied out of a redirect
+// URL the code is URL-encoded (Google's look like `4%2F0Ad…`), and pasting that
+// verbatim used to require hand-editing `%2F`→`/`. Accept a full redirect URL,
+// a bare `code=…` fragment, or the raw code, and decode it once.
+function extractAuthCode(raw: string): string {
+  let code = (raw || '').trim()
+  const m = code.match(/[?&]code=([^&\s]+)/) || code.match(/^code=([^&\s]+)/)
+  if (m) code = m[1]
+  try {
+    code = decodeURIComponent(code)
+  } catch {
+    // not valid percent-encoding — keep the raw value
+  }
+  return code
 }
 
 function httpsPostJson(
@@ -157,15 +120,112 @@ function httpsPostJson(
   })
 }
 
-const WARNING = `Add <b>external, off-box</b> backup targets here. (A local backup always runs on this server too — see the <b>Backup Safety</b> action for how backups and encryption work and why an off-box copy matters.)
+// Exchange a fresh authorization code for an rclone token JSON (holds the
+// refresh token rclone uses to mint access tokens). Runs only when a target is
+// being enabled with a new code.
+async function exchangeGoogleCode(
+  clientId: string,
+  clientSecret: string,
+  authCodeRaw: string,
+): Promise<string> {
+  const r = await httpsPostJson(
+    'oauth2.googleapis.com',
+    '/token',
+    new URLSearchParams({
+      code: extractAuthCode(authCodeRaw),
+      client_id: clientId,
+      client_secret: clientSecret,
+      redirect_uri: 'http://localhost',
+      grant_type: 'authorization_code',
+    }).toString(),
+    { 'Content-Type': 'application/x-www-form-urlencoded' },
+  )
+  if (!r.access_token || !r.refresh_token)
+    throw new Error(
+      'Google did not return valid tokens. Re-copy the full authorization code.',
+    )
+  return JSON.stringify({
+    access_token: r.access_token,
+    token_type: r.token_type || 'Bearer',
+    refresh_token: r.refresh_token,
+    expiry: new Date(Date.now() + r.expires_in * 1000).toISOString(),
+  })
+}
 
-<b>Use a target on a DIFFERENT machine than this server</b> — a NAS, another computer, or a third-party provider. A copy on this same box is recoverable only from a manual StartOS backup, so it's likely stale when you need it; an off-box target stays current. Toggle a target off to stop using it without losing its saved settings. Tor .onion targets are not supported yet — use clearnet addresses.
+async function exchangeDropboxCode(
+  clientId: string,
+  clientSecret: string,
+  authCodeRaw: string,
+): Promise<string> {
+  const r = await httpsPostJson(
+    'api.dropboxapi.com',
+    '/oauth2/token',
+    new URLSearchParams({
+      code: extractAuthCode(authCodeRaw),
+      grant_type: 'authorization_code',
+    }).toString(),
+    {
+      Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+  )
+  if (!r.refresh_token)
+    throw new Error(
+      'Dropbox did not return a refresh token — the code may have expired or already been used. Approve the app in the browser and paste the fresh code it shows.',
+    )
+  return `{"access_token":"${r.access_token}","token_type":"bearer","refresh_token":"${r.refresh_token}","expiry":"${new Date(Date.now() + r.expires_in * 1000).toISOString()}"}`
+}
 
-Setup notes:
-• <b>SFTP</b>: point at any always-on SSH server (NAS, Raspberry Pi, VPS). Password or SSH key auth. Use a relative folder path (no leading /) to land in the home directory.
-• <b>Nextcloud</b>: create an app password under Settings → Security; use the WebDAV URL https://your.host/remote.php/dav/files/USERNAME/.
-• <b>Dropbox</b>: create a Scoped/App-folder app, enable files.content.read+write, then supply App Key + App Secret + (Authorization Code or Refresh Token).
-• <b>Google Drive</b>: create an OAuth Desktop client (Drive API enabled), then supply Client ID + Client Secret + (Authorization Code or Refresh Token).`
+// Build a DUMMY-access-token rclone token JSON from a bare refresh token. rclone
+// refreshes the (expired) access token on first use, so only the refresh token
+// needs to be real.
+function tokenFromRefresh(refreshToken: string, google: boolean): string {
+  return google
+    ? JSON.stringify({
+        access_token: 'DUMMY',
+        token_type: 'Bearer',
+        refresh_token: refreshToken,
+        expiry: '2020-01-01T00:00:00Z',
+      })
+    : `{"access_token":"DUMMY","token_type":"bearer","refresh_token":"${refreshToken}","expiry":"2020-01-01T00:00:00Z"}`
+}
+
+// Normalize a pasted OpenSSH private key into the single-line, `\n`-escaped form
+// rclone.conf's key_pem wants (the agent writes it verbatim).
+function normalizeKeyPem(keyInput: string): string {
+  const begin = '-----BEGIN OPENSSH PRIVATE KEY-----'
+  const end = '-----END OPENSSH PRIVATE KEY-----'
+  const norm = keyInput.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim()
+  if (!norm.includes(begin) || !norm.includes(end))
+    throw new Error('SFTP: invalid SSH key (missing BEGIN/END markers).')
+  const body = norm
+    .substring(norm.indexOf(begin) + begin.length, norm.indexOf(end))
+    .replace(/\s+/g, '')
+  const out = [begin]
+  for (let i = 0; i < body.length; i += 70) out.push(body.substring(i, i + 70))
+  out.push(end)
+  return out.join('\n').replace(/\n/g, '\\n')
+}
+
+function refreshOf(tok?: string | null): string {
+  try {
+    return JSON.parse(tok || '{}').refresh_token || ''
+  } catch {
+    return ''
+  }
+}
+
+const WARNING = `<b>⚠ A StartOS backup is what makes these restorable.</b> Your wallet database isn't inside it, but your wallet seed and the pointer to these targets are. Set StartOS backups up, and after you enable a target below take a fresh one (System → Create Backup) — one taken earlier won't know about this target, so the restore comes back stale.<br><br>
+<b>Add an external, off-box target.</b> A local on-box backup always runs too, but it survives only inside a manual StartOS backup — likely stale. Use a <b>different machine</b> (a NAS, another computer, or a provider). Toggle one off to stop using it while keeping its settings. Tor .onion targets aren't supported yet.<br><br>
+<b>After saving:</b> run <b>Back Up Now</b> to verify, then take that StartOS backup.<br><br>
+<b>Setup:</b>
+<ul>
+<li><b>SFTP</b>: point at any always-on SSH server (NAS, Raspberry Pi, VPS). Password or SSH key auth. Use a relative folder path (no leading /) to land in the home directory.</li>
+<li><b>Nextcloud</b>: create an app password under Settings → Security; use the WebDAV URL https://your.host/remote.php/dav/files/USERNAME/. For a LAN server with a self-signed certificate, turn on "Trust self-signed certificate".</li>
+<li><b>Dropbox</b>: create a Scoped/App-folder app, enable files.content.read+write, then supply App Key + App Secret and enable this target. Submit once — you'll get a Dropbox link; approve it and paste the <b>authorization code Dropbox shows you</b> (not a "Generated access token") into the Authorization Code field, then submit again.</li>
+<li><b>Google Drive</b>: create an OAuth Desktop client (Drive API enabled), then supply Client ID + Client Secret and enable this target. Submit once for a Google sign-in link; approve it, then paste the <b>code</b> from the redirected localhost URL (paste it as-is — no need to hand-edit %2F) and submit again.</li>
+<li>Prefer credentials over browser flows? Paste an existing <b>Refresh Token</b> for Google/Dropbox instead of an authorization code.</li>
+</ul>`
 
 const enabledToggle = () =>
   sdk.Value.toggle({
@@ -269,6 +329,12 @@ const nextcloudFields = {
     default: '',
     masked: true,
     required: false,
+  }),
+  'nextcloud-insecure-tls': sdk.Value.toggle({
+    name: 'Trust self-signed certificate',
+    description:
+      'Skip TLS certificate verification for this server. Turn on ONLY for a Nextcloud on your own LAN using a self-signed or private-CA certificate (e.g. an IP or .local address that fails with "certificate signed by unknown authority"). Your backup is encrypted with your wallet key before upload, so the server only ever receives ciphertext either way.',
+    default: false,
   }),
   'nextcloud-path': sdk.Value.text({
     name: 'Folder Path',
@@ -387,7 +453,7 @@ export const configureBackup = sdk.Action.withInput(
   async ({ effects }) => ({
     name: 'Configure Backups',
     description:
-      'Add external, off-box targets for your encrypted wallet backups (a local on-box backup always runs too, but it is recoverable only via a manual, stale-prone StartOS backup). The database is snapshotted and shipped automatically on every change. Toggle a target off to stop using it without losing its saved settings.',
+      'Add encrypted, off-box backup targets (Drive, Dropbox, Nextcloud, SFTP). A local on-box backup always runs too. Requires a StartOS backup to be restorable — take one after enabling a target. Toggle a target off to keep its settings.',
     warning: WARNING,
     allowedStatuses: 'any',
     group: 'Backups',
@@ -413,68 +479,55 @@ export const configureBackup = sdk.Action.withInput(
     ),
   }),
 
+  // Prefill the form from the structured config. Passwords / auth codes are left
+  // blank (they round-trip as "unchanged" and the handler keeps the stored
+  // value); everything else shows its saved value.
   async ({ effects }) => {
-    const config = (await backupConfigJson
+    const cfg = (await backupConfigJson
       .read()
       .once()
-      .catch(() => ({}))) as any
-    const existingConf = config?.rcloneConfig
-      ? Buffer.from(config.rcloneConfig, 'base64').toString('utf8')
-      : ''
-    const sections = parseRcloneConf(existingConf)
-    const getPath = (p: string) =>
-      config?.selectedRcloneRemotes
-        ?.find((r: string) => r.startsWith(p + ':'))
-        ?.split(':')[1] || backupFolderDefault
-    const isOn = (p: string) =>
-      !!config?.selectedRcloneRemotes?.some((r: string) =>
-        r.startsWith(p + ':'),
-      )
-    const refreshOf = (tok?: string) => {
-      try {
-        return JSON.parse(tok || '{}').refresh_token || ''
-      } catch {
-        return ''
-      }
-    }
-    const gdrive = sections['gdrive'] || {}
-    const dropbox = sections['dropbox'] || {}
-    const sftp = sections['sftp'] || {}
-
+      .catch(() => null)) as any
+    const g = cfg?.gdrive || {}
+    const d = cfg?.dropbox || {}
+    const n = cfg?.nextcloud || {}
+    const s = cfg?.sftp || {}
     return {
       gdrive: {
-        enabled: isOn('gdrive'),
-        'gdrive-client-id': gdrive.client_id || '',
-        'gdrive-client-secret': gdrive.client_secret || '',
+        enabled: !!g.enabled,
+        'gdrive-client-id': g.clientId || '',
+        'gdrive-client-secret': g.clientSecret || '',
         'gdrive-auth-code': '',
-        'gdrive-refresh-token': refreshOf(gdrive.token),
-        'gdrive-path': getPath('gdrive'),
+        'gdrive-refresh-token': refreshOf(g.token),
+        'gdrive-path': g.path || backupFolderDefault,
       },
       dropbox: {
-        enabled: isOn('dropbox'),
-        'dropbox-client-id': dropbox.client_id || '',
-        'dropbox-client-secret': dropbox.client_secret || '',
+        enabled: !!d.enabled,
+        'dropbox-client-id': d.clientId || '',
+        'dropbox-client-secret': d.clientSecret || '',
         'dropbox-auth-code': '',
-        'dropbox-refresh-token': refreshOf(dropbox.token),
-        'dropbox-path': getPath('dropbox'),
+        'dropbox-refresh-token': refreshOf(d.token),
+        'dropbox-path': d.path || backupFolderDefault,
       },
       nextcloud: {
-        enabled: isOn('nextcloud'),
-        'nextcloud-url': sections['nextcloud']?.url || '',
-        'nextcloud-user': sections['nextcloud']?.user || '',
+        enabled: !!n.enabled,
+        'nextcloud-url': n.url || '',
+        'nextcloud-user': n.user || '',
         'nextcloud-pass': '',
-        'nextcloud-path': getPath('nextcloud'),
+        'nextcloud-insecure-tls': !!n.insecureTls,
+        'nextcloud-path': n.path || backupFolderDefault,
       },
       sftp: {
-        enabled: isOn('sftp'),
+        enabled: !!s.enabled,
         auth: {
-          selection: sftp.key_pem ? 'key' : 'password',
+          selection: s.authType === 'key' ? 'key' : 'password',
           value: {
-            'sftp-host': sftp.host || '',
-            'sftp-user': sftp.user || '',
-            'sftp-port': sftp.port || '22',
-            'sftp-path': getPath('sftp'),
-            ...(sftp.key_pem ? { 'sftp-key': '' } : { 'sftp-pass': '' }),
+            'sftp-host': s.host || '',
+            'sftp-user': s.user || '',
+            'sftp-port': s.port || '22',
+            'sftp-path': s.path || backupFolderDefault,
+            ...(s.authType === 'key'
+              ? { 'sftp-key': '' }
+              : { 'sftp-pass': '' }),
           },
         },
       },
@@ -482,213 +535,101 @@ export const configureBackup = sdk.Action.withInput(
   },
 
   async ({ effects, input }) => {
-    const config = (await backupConfigJson
+    const cfg = (await backupConfigJson
       .read()
       .once()
-      .catch(() => ({}))) as any
-    // Start from the existing config so toggled-off targets keep their saved
-    // sections (only enabled targets land in selectedRcloneRemotes).
-    let conf = config?.rcloneConfig
-      ? Buffer.from(config.rcloneConfig, 'base64').toString('utf8')
-      : ''
-    const sections = parseRcloneConf(conf)
-    const enabledRemotes: string[] = []
+      .catch(() => null)) as any
+    const patch: any = {}
 
     for (const provider of VALID_PROVIDERS) {
       const o = (input as any)[provider] || {}
-      if (!o.enabled) continue // keep its section (metadata preserved), inactive
+      const enabled = !!o.enabled
+      const prev = cfg?.[provider] || {}
 
-      const existing = sections[provider] || {}
-      let path = backupFolderDefault
-      const lines = [`[${provider}]`]
-
-      if (provider === 'gdrive') {
-        path = o['gdrive-path']?.trim() || getExistingPath(config, 'gdrive')
+      if (provider === 'gdrive' || provider === 'dropbox') {
+        const google = provider === 'gdrive'
+        const label = google ? 'Google Drive' : 'Dropbox'
         const clientId =
-          o['gdrive-client-id']?.trim() || existing.client_id || ''
+          o[`${provider}-client-id`]?.trim() || prev.clientId || ''
         const clientSecret =
-          o['gdrive-client-secret']?.trim() || existing.client_secret || ''
-        const authCodeRaw = o['gdrive-auth-code']?.trim()
-        const refreshToken = o['gdrive-refresh-token']?.trim()
-        if (!clientId || !clientSecret)
+          o[`${provider}-client-secret`]?.trim() || prev.clientSecret || ''
+        const authCodeRaw = o[`${provider}-auth-code`]?.trim()
+        const refreshToken = o[`${provider}-refresh-token`]?.trim()
+        const path =
+          o[`${provider}-path`]?.trim() || prev.path || backupFolderDefault
+        if (enabled && (!clientId || !clientSecret))
           throw new Error(
-            'Google Drive: Client ID and Client Secret are required.',
+            google
+              ? 'Google Drive: Client ID and Client Secret are required.'
+              : 'Dropbox: App Key and App Secret are required.',
           )
-        let token = existing.token || ''
-        if (refreshToken) {
-          token = JSON.stringify({
-            access_token: 'DUMMY',
-            token_type: 'Bearer',
-            refresh_token: refreshToken,
-            expiry: '2020-01-01T00:00:00Z',
-          })
-        } else if (authCodeRaw) {
-          const code = authCodeRaw.includes('code=')
-            ? (authCodeRaw.match(/code=([^&]+)/)?.[1] ?? authCodeRaw)
-            : authCodeRaw
-          const r = await httpsPostJson(
-            'oauth2.googleapis.com',
-            '/token',
-            new URLSearchParams({
-              code,
-              client_id: clientId,
-              client_secret: clientSecret,
-              redirect_uri: 'http://localhost',
-              grant_type: 'authorization_code',
-            }).toString(),
-            { 'Content-Type': 'application/x-www-form-urlencoded' },
-          )
-          if (!r.access_token || !r.refresh_token)
-            throw new Error(
-              'Google did not return valid tokens. Re-copy the full authorization code.',
-            )
-          token = JSON.stringify({
-            access_token: r.access_token,
-            token_type: r.token_type || 'Bearer',
-            refresh_token: r.refresh_token,
-            expiry: new Date(Date.now() + r.expires_in * 1000).toISOString(),
-          })
-        }
-        if (!token)
+        // Keep the stored token unless the user supplied a new refresh token or
+        // a fresh authorization code (exchanged here, only when enabling).
+        let token: string | null = prev.token || null
+        if (refreshToken) token = tokenFromRefresh(refreshToken, google)
+        else if (enabled && authCodeRaw)
+          token = google
+            ? await exchangeGoogleCode(clientId, clientSecret, authCodeRaw)
+            : await exchangeDropboxCode(clientId, clientSecret, authCodeRaw)
+        if (enabled && !token)
           throw new Error(
-            `Google Drive authorization required. Visit:\n${generateGoogleAuthUrl(clientId)}\nthen paste the authorization code or a refresh token and submit again.`,
+            google
+              ? `Google Drive authorization required. Visit:\n${generateGoogleAuthUrl(clientId)}\nthen paste the authorization code or a refresh token and submit again.`
+              : `Dropbox authorization required. Visit:\n${generateDropboxAuthUrl(clientId)}\napprove the app, then paste the authorization code it displays (not a "Generated access token") and submit again.`,
           )
-        lines.push(
-          'type = drive',
-          'scope = drive',
-          `client_id = ${clientId}`,
-          `client_secret = ${clientSecret}`,
-          `token = ${token}`,
-        )
-      } else if (provider === 'dropbox') {
-        path = o['dropbox-path']?.trim() || getExistingPath(config, 'dropbox')
-        const clientId =
-          o['dropbox-client-id']?.trim() || existing.client_id || ''
-        const clientSecret =
-          o['dropbox-client-secret']?.trim() || existing.client_secret || ''
-        const authCode = o['dropbox-auth-code']?.trim()
-        const refreshToken = o['dropbox-refresh-token']?.trim()
-        if (!clientId || !clientSecret)
-          throw new Error('Dropbox: App Key and App Secret are required.')
-        let token = existing.token || ''
-        if (authCode) {
-          const r = await httpsPostJson(
-            'api.dropboxapi.com',
-            '/oauth2/token',
-            new URLSearchParams({
-              code: authCode,
-              grant_type: 'authorization_code',
-            }).toString(),
-            {
-              Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`,
-              'Content-Type': 'application/x-www-form-urlencoded',
-            },
-          )
-          if (!r.refresh_token)
-            throw new Error(
-              'Dropbox did not return a refresh token. Re-copy the authorization code.',
-            )
-          token = `{"access_token":"${r.access_token}","token_type":"bearer","refresh_token":"${r.refresh_token}","expiry":"${new Date(Date.now() + r.expires_in * 1000).toISOString()}"}`
-        } else if (refreshToken) {
-          token = `{"access_token":"DUMMY","token_type":"bearer","refresh_token":"${refreshToken}","expiry":"2020-01-01T00:00:00Z"}`
-        }
-        if (!token)
-          throw new Error(
-            'Dropbox: provide an Authorization Code or an existing Refresh Token.',
-          )
-        lines.push(
-          'type = dropbox',
-          `client_id = ${clientId}`,
-          `client_secret = ${clientSecret}`,
-          `token = ${token}`,
-        )
+        patch[provider] = { enabled, clientId, clientSecret, token, path }
       } else if (provider === 'nextcloud') {
-        path =
-          o['nextcloud-path']?.trim() || getExistingPath(config, 'nextcloud')
-        const url = (o['nextcloud-url']?.trim() || existing.url || '') as string
-        const user = o['nextcloud-user']?.trim() || existing.user || ''
-        rejectOnion(url, 'Nextcloud')
-        rejectLoopback(url, 'Nextcloud')
-        let pass = existing.pass || ''
-        const passInput = o['nextcloud-pass']?.trim()
-        if (passInput) pass = obscure(passInput)
-        else if (pass && !isObscured(pass)) pass = obscure(pass)
-        if (!url || !user || !pass)
-          throw new Error(
-            'Nextcloud: URL, username, and password are required.',
-          )
-        lines.push(
-          'type = webdav',
-          `url = ${url}`,
-          'vendor = nextcloud',
-          `user = ${user}`,
-          `pass = ${pass}`,
-        )
-      } else if (provider === 'sftp') {
-        const auth = o.auth
-        const v = auth.value
-        const host = (v['sftp-host']?.trim() || existing.host || '') as string
-        const user = v['sftp-user']?.trim() || existing.user || ''
-        const port = v['sftp-port']?.trim() || existing.port || '22'
-        path = v['sftp-path']?.trim() || getExistingPath(config, 'sftp')
-        rejectOnion(host, 'SFTP')
-        rejectLoopback(host, 'SFTP')
-        if (!host || !user)
-          throw new Error('SFTP: host and username are required.')
-        lines.push(
-          'type = sftp',
-          `host = ${host}`,
-          `user = ${user}`,
-          'key_use_agent = false',
-          `port = ${port}`,
-        )
-        if (auth.selection === 'password') {
-          let pass = existing.pass || ''
-          const passInput = v['sftp-pass']?.trim()
-          if (passInput) pass = obscure(passInput)
-          else if (pass && !isObscured(pass)) pass = obscure(pass)
-          if (pass) lines.push(`pass = ${pass}`)
+        const url = o['nextcloud-url']?.trim() || prev.url || ''
+        const user = o['nextcloud-user']?.trim() || prev.user || ''
+        const pass = o['nextcloud-pass']?.trim() || prev.pass || null
+        const insecureTls = !!o['nextcloud-insecure-tls']
+        const path =
+          o['nextcloud-path']?.trim() || prev.path || backupFolderDefault
+        if (enabled) {
+          rejectOnion(url, 'Nextcloud')
+          rejectLoopback(url, 'Nextcloud')
+          if (!url || !user || !pass)
+            throw new Error(
+              'Nextcloud: URL, username, and password are required.',
+            )
+        }
+        patch.nextcloud = { enabled, url, user, pass, insecureTls, path }
+      } else {
+        // sftp
+        const auth = o.auth || { selection: 'password', value: {} }
+        const v = auth.value || {}
+        const host = v['sftp-host']?.trim() || prev.host || ''
+        const user = v['sftp-user']?.trim() || prev.user || ''
+        const port = v['sftp-port']?.trim() || prev.port || '22'
+        const path = v['sftp-path']?.trim() || prev.path || backupFolderDefault
+        const authType = auth.selection === 'key' ? 'key' : 'password'
+        if (enabled) {
+          rejectOnion(host, 'SFTP')
+          rejectLoopback(host, 'SFTP')
+          if (!host || !user)
+            throw new Error('SFTP: host and username are required.')
+        }
+        let pass: string | null = null
+        let keyPem: string | null = null
+        if (authType === 'password') {
+          pass = v['sftp-pass']?.trim() || prev.pass || null
         } else {
           const keyInput = v['sftp-key']
-          let keyPem = existing.key_pem || ''
-          if (keyInput && keyInput.trim()) {
-            const begin = '-----BEGIN OPENSSH PRIVATE KEY-----'
-            const end = '-----END OPENSSH PRIVATE KEY-----'
-            const norm = keyInput
-              .replace(/\r\n/g, '\n')
-              .replace(/\r/g, '\n')
-              .trim()
-            if (!norm.includes(begin) || !norm.includes(end))
-              throw new Error(
-                'SFTP: invalid SSH key (missing BEGIN/END markers).',
-              )
-            const body = norm
-              .substring(norm.indexOf(begin) + begin.length, norm.indexOf(end))
-              .replace(/\s+/g, '')
-            const out = [begin]
-            for (let i = 0; i < body.length; i += 70)
-              out.push(body.substring(i, i + 70))
-            out.push(end)
-            keyPem = out.join('\n').replace(/\n/g, '\\n')
-          }
-          if (!keyPem) throw new Error('SFTP: a private key is required.')
-          lines.push(`key_pem = ${keyPem}`)
+          keyPem =
+            keyInput && keyInput.trim()
+              ? normalizeKeyPem(keyInput)
+              : prev.keyPem || null
+          if (enabled && !keyPem)
+            throw new Error('SFTP: a private key is required.')
         }
+        patch.sftp = { enabled, host, user, port, authType, pass, keyPem, path }
       }
-
-      conf = removeSection(conf, provider)
-      conf = (conf.trim() + '\n' + lines.join('\n')).trim()
-      enabledRemotes.push(`${provider}:${path}`)
     }
 
-    await backupConfigJson.merge(effects, {
-      selectedRcloneRemotes: enabledRemotes,
-      rcloneConfig: conf.trim()
-        ? Buffer.from(conf, 'utf8').toString('base64')
-        : null,
-    })
+    await backupConfigJson.merge(effects, patch)
 
-    if (enabledRemotes.length === 0) {
+    const enabledList = VALID_PROVIDERS.filter((p) => patch[p]?.enabled)
+    if (enabledList.length === 0) {
       return {
         version: '1',
         title: 'No External Target',
@@ -697,24 +638,13 @@ export const configureBackup = sdk.Action.withInput(
         result: null,
       }
     }
-
     return {
       version: '1',
       title: 'External Backup Enabled',
-      message: `Your wallet database will be snapshotted, encrypted with your seed-derived key, and shipped to: ${enabledRemotes
-        .map((r) => r.split(':')[0])
-        .join(
-          ', ',
-        )} (plus the always-on local copy). Run "Back Up Now" to verify, and check the service logs for per-target results.`,
+      message: `Your wallet database will be snapshotted, encrypted with your seed-derived key, and shipped to: ${enabledList.join(
+        ', ',
+      )} (plus the always-on local copy). Run "Back Up Now" to verify, and check the Wallet Backup health status for per-target results.`,
       result: null,
     }
   },
 )
-
-function getExistingPath(config: any, provider: string): string {
-  return (
-    config?.selectedRcloneRemotes
-      ?.find((r: string) => r.startsWith(provider + ':'))
-      ?.split(':')[1] || backupFolderDefault
-  )
-}

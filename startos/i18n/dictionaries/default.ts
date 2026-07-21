@@ -13,7 +13,7 @@ const dict = {
 
   // actions/setUiPassword.ts, init/initializeService.ts
   'Set UI Password': 6,
-  'Generate a new password for logging in to the Bark Wallet web interface. The username is always "admin".':
+  'Generate a new password for logging in to the Bark Wallet web interface. Rotating it also signs out any active sessions.':
     7,
   'Generate a password to log in to the Bark Wallet web interface': 8,
 } as const

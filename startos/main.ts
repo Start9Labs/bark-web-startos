@@ -1,5 +1,6 @@
 import { backupConfigJson } from './fileModels/backupConfig.json'
 import { backupStateJson } from './fileModels/backupState.json'
+import { uiPasswordFile } from './fileModels/uiPassword'
 import { i18n } from './i18n'
 import { sdk } from './sdk'
 import {
@@ -9,6 +10,8 @@ import {
   barkdPort,
   barkNetwork,
   chainSource,
+  uiPasswordPath,
+  uiSessionSecretPath,
   uiPort,
   walletDataPath,
   walletDir,
@@ -24,6 +27,10 @@ function ago(seconds: number): string {
 export const main = sdk.setupMain(async ({ effects }) => {
   console.info(i18n('Starting Bark Wallet!'))
 
+  // Re-run (restarting the API) whenever the UI password changes, so a rotate
+  // takes effect and drops existing sessions.
+  await uiPasswordFile.read().const(effects)
+
   const mounts = sdk.Mounts.of().mountVolume({
     volumeId: 'main',
     subpath: null,
@@ -31,7 +38,7 @@ export const main = sdk.setupMain(async ({ effects }) => {
     readonly: false,
   })
 
-  const barkdSub = await sdk.SubContainer.of(
+  const barkdSub = sdk.SubContainer.of(
     effects,
     { imageId: 'bark' },
     mounts,
@@ -76,7 +83,7 @@ export const main = sdk.setupMain(async ({ effects }) => {
       requires: ['restore-pull'],
     })
     .addDaemon('api', {
-      subcontainer: await sdk.SubContainer.of(
+      subcontainer: sdk.SubContainer.of(
         effects,
         { imageId: 'bark' },
         mounts,
@@ -86,12 +93,16 @@ export const main = sdk.setupMain(async ({ effects }) => {
         command: ['sh', '-c', 'cd /app/api && exec node dist/index.js'],
         env: {
           PORT: String(apiPort),
+          HOST: '127.0.0.1',
           WALLET_DIR: walletDir,
           WALLET_DATA_PATH: walletDataPath,
           BARKD_URL: `http://127.0.0.1:${barkdPort}`,
           ARK_SERVER: arkServer,
           CHAIN_SOURCE: chainSource,
           BARK_NETWORK: barkNetwork,
+          UI_AUTH: 'true',
+          UI_PASSWORD_FILE: uiPasswordPath,
+          UI_SESSION_SECRET_FILE: uiSessionSecretPath,
         },
       },
       ready: {
@@ -105,7 +116,7 @@ export const main = sdk.setupMain(async ({ effects }) => {
       requires: ['barkd'],
     })
     .addDaemon('nginx', {
-      subcontainer: await sdk.SubContainer.of(
+      subcontainer: sdk.SubContainer.of(
         effects,
         { imageId: 'bark' },
         mounts,
@@ -125,7 +136,7 @@ export const main = sdk.setupMain(async ({ effects }) => {
     .addDaemon('backup-agent', {
       // Watches db.sqlite, snapshots on change (+ a periodic backstop),
       // encrypts with a seed-derived key, and ships to the configured targets.
-      subcontainer: await sdk.SubContainer.of(
+      subcontainer: sdk.SubContainer.of(
         effects,
         { imageId: 'bark' },
         mounts,
@@ -149,7 +160,13 @@ export const main = sdk.setupMain(async ({ effects }) => {
           // A local backup always runs, but recovering it depends on a manual
           // StartOS backup, so it's likely stale when you need it. Only an
           // off-box target stays current — no external target => failing.
-          if (!cfg?.selectedRcloneRemotes?.length)
+          const anyExternal = [
+            cfg?.gdrive,
+            cfg?.dropbox,
+            cfg?.nextcloud,
+            cfg?.sftp,
+          ].some((t) => t?.enabled)
+          if (!anyExternal)
             return {
               result: 'failure',
               message:

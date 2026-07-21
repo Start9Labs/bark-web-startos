@@ -9,7 +9,7 @@ export default {
     4: 'Interfaz web',
     5: 'La interfaz web de Bark Wallet',
     6: 'Establecer contraseña de la interfaz',
-    7: 'Genera una nueva contraseña para iniciar sesión en la interfaz web de Bark Wallet. El nombre de usuario siempre es «admin».',
+    7: 'Genera una nueva contraseña para iniciar sesión en la interfaz web de Bark Wallet. Rotarla también cierra las sesiones activas.',
     8: 'Genera una contraseña para iniciar sesión en la interfaz web de Bark Wallet',
   },
   de_DE: {
@@ -20,7 +20,7 @@ export default {
     4: 'Weboberfläche',
     5: 'Die Weboberfläche von Bark Wallet',
     6: 'UI-Passwort festlegen',
-    7: 'Generiert ein neues Passwort für die Anmeldung an der Weboberfläche von Bark Wallet. Der Benutzername ist immer „admin“.',
+    7: 'Generiert ein neues Passwort für die Anmeldung an der Weboberfläche von Bark Wallet. Beim Ändern werden aktive Sitzungen abgemeldet.',
     8: 'Generiere ein Passwort für die Anmeldung an der Weboberfläche von Bark Wallet',
   },
   pl_PL: {
@@ -31,7 +31,7 @@ export default {
     4: 'Interfejs webowy',
     5: 'Interfejs webowy Bark Wallet',
     6: 'Ustaw hasło interfejsu',
-    7: 'Generuje nowe hasło do logowania w interfejsie webowym Bark Wallet. Nazwa użytkownika to zawsze „admin”.',
+    7: 'Generuje nowe hasło do logowania w interfejsie webowym Bark Wallet. Jego zmiana wylogowuje aktywne sesje.',
     8: 'Wygeneruj hasło do logowania w interfejsie webowym Bark Wallet',
   },
   fr_FR: {
@@ -42,7 +42,7 @@ export default {
     4: 'Interface web',
     5: "L'interface web de Bark Wallet",
     6: "Définir le mot de passe de l'interface",
-    7: "Génère un nouveau mot de passe pour se connecter à l'interface web de Bark Wallet. Le nom d'utilisateur est toujours « admin ».",
+    7: "Génère un nouveau mot de passe pour se connecter à l'interface web de Bark Wallet. Sa rotation déconnecte les sessions actives.",
     8: "Génère un mot de passe pour se connecter à l'interface web de Bark Wallet",
   },
 } satisfies Record<string, LangDict>
