@@ -1,7 +1,7 @@
 import { VersionInfo } from '@start9labs/start-sdk'
 
 export const current = VersionInfo.of({
-  version: '0.3.1:2',
+  version: '0.3.1:3',
   releaseNotes: {
     en_US: `Adds an in-app login page (replacing the browser popup) and updates bark-web to v0.3.1 (barkd 0.3.0). Set your login password under Actions → Set UI Password.
 
