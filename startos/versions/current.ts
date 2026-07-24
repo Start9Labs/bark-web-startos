@@ -1,48 +1,43 @@
 import { VersionInfo } from '@start9labs/start-sdk'
 
 export const current = VersionInfo.of({
-  version: '0.3.1:3',
+  version: '0.4.0:0',
   releaseNotes: {
-    en_US: `Adds an in-app login page (replacing the browser popup) and updates bark-web to v0.3.1 (barkd 0.3.0). Set your login password under Actions → Set UI Password.
+    en_US: `Updates bark-web to v0.4.0 (barkd 0.4.0).
 
-External wallet-backup fixes:
-• Dropbox setup now gives the same guided browser link as Google Drive; authorization codes no longer need hand-editing.
-• Nextcloud can back up to a LAN server with a self-signed certificate.
-• SFTP targets that rejected setting file timestamps now upload correctly.
-• The Wallet Backup health check names the failing target and reason, and no longer floods the logs.
-• Entered target settings are saved even before you toggle Enabled, and passwords persist reliably across saves.`,
-    es_ES: `Añade una página de inicio de sesión nativa en la app (en lugar de la ventana emergente del navegador) y actualiza bark-web a v0.3.1 (barkd 0.3.0). Configura tu contraseña de acceso en Acciones → Establecer contraseña de la interfaz.
+• Board — move your on-chain funds into your Ark balance, all at once or a chosen amount; boarding transactions are badged "On-chain: Board" in your movement history.
+• barkd 0.4.0 makes on-chain sends and offboards crash-safe and resumable: an interrupted operation now recovers on the next wallet sync instead of being lost, and on-chain sends that produce change no longer fail.
+• Kraken is now the default Bitcoin price source.
 
-Correcciones de las copias de seguridad externas del monedero:
-• La configuración de Dropbox ahora ofrece el mismo enlace guiado en el navegador que Google Drive; los códigos de autorización ya no necesitan edición manual.
-• Nextcloud puede hacer copias en un servidor de la red local con certificado autofirmado.
-• Los destinos SFTP que rechazaban fijar la fecha de los archivos ahora suben correctamente.
-• La comprobación de estado «Copia del monedero» indica el destino y el motivo del fallo, y ya no satura los registros.
-• Los ajustes introducidos se guardan aunque no hayas activado «Habilitado», y las contraseñas se conservan de forma fiable al guardar.`,
-    de_DE: `Fügt eine native In-App-Anmeldeseite hinzu (statt des Browser-Popups) und aktualisiert bark-web auf v0.3.1 (barkd 0.3.0). Legen Sie Ihr Anmeldepasswort unter Aktionen → UI-Passwort festlegen fest.
+Full changelog: https://gitlab.com/ark-bitcoin/labs/bark-web/-/blob/v0.4.0/CHANGELOG.md`,
+    es_ES: `Actualiza bark-web a v0.4.0 (barkd 0.4.0).
 
-Korrekturen der externen Wallet-Backups:
-• Die Dropbox-Einrichtung bietet jetzt denselben geführten Browser-Link wie Google Drive; Autorisierungscodes müssen nicht mehr von Hand bearbeitet werden.
-• Nextcloud kann auf einen LAN-Server mit selbstsigniertem Zertifikat sichern.
-• SFTP-Ziele, die das Setzen des Datei-Zeitstempels ablehnten, laden nun korrekt hoch.
-• Die Zustandsprüfung „Wallet-Backup“ nennt Ziel und Grund des Fehlers und flutet die Logs nicht mehr.
-• Eingegebene Zieleinstellungen werden auch vor dem Aktivieren gespeichert, und Passwörter bleiben beim Speichern zuverlässig erhalten.`,
-    pl_PL: `Dodaje natywną stronę logowania w aplikacji (zamiast wyskakującego okna przeglądarki) i aktualizuje bark-web do v0.3.1 (barkd 0.3.0). Ustaw hasło logowania w Akcje → Ustaw hasło interfejsu.
+• Board — mueve tus fondos on-chain a tu saldo de Ark, de una vez o por una cantidad elegida; las transacciones de embarque aparecen etiquetadas como «On-chain: Board» en tu historial de movimientos.
+• barkd 0.4.0 hace que los envíos on-chain y los offboards sean resistentes a fallos y reanudables: una operación interrumpida ahora se recupera en la siguiente sincronización del monedero en lugar de perderse, y los envíos on-chain que generan cambio ya no fallan.
+• Kraken es ahora la fuente de precio de Bitcoin predeterminada.
 
-Poprawki zewnętrznych kopii zapasowych portfela:
-• Konfiguracja Dropbox udostępnia teraz taki sam prowadzony link w przeglądarce jak Google Drive; kody autoryzacji nie wymagają już ręcznej edycji.
-• Nextcloud może tworzyć kopie na serwerze w sieci lokalnej z certyfikatem samopodpisanym.
-• Cele SFTP, które odrzucały ustawianie znacznika czasu plików, teraz przesyłają poprawnie.
-• Kontrola stanu „Kopia portfela“ podaje cel i przyczynę błędu i nie zalewa już logów.
-• Wprowadzone ustawienia celu są zapisywane nawet przed włączeniem „Włączone“, a hasła są niezawodnie zachowywane przy zapisie.`,
-    fr_FR: `Ajoute une page de connexion native intégrée à l'application (au lieu de la fenêtre du navigateur) et met à jour bark-web vers v0.3.1 (barkd 0.3.0). Définissez votre mot de passe de connexion dans Actions → Définir le mot de passe de l'interface.
+Registro de cambios completo: https://gitlab.com/ark-bitcoin/labs/bark-web/-/blob/v0.4.0/CHANGELOG.md`,
+    de_DE: `Aktualisiert bark-web auf v0.4.0 (barkd 0.4.0).
 
-Corrections des sauvegardes externes du portefeuille :
-• La configuration de Dropbox propose désormais le même lien guidé dans le navigateur que Google Drive ; les codes d'autorisation n'ont plus besoin d'être modifiés à la main.
-• Nextcloud peut sauvegarder vers un serveur du réseau local avec un certificat auto-signé.
-• Les cibles SFTP qui refusaient de définir l'horodatage des fichiers téléversent maintenant correctement.
-• Le contrôle d'état « Sauvegarde du portefeuille » indique la cible et la raison de l'échec et n'inonde plus les journaux.
-• Les paramètres saisis sont enregistrés même avant d'activer « Activé », et les mots de passe sont conservés de façon fiable à l'enregistrement.`,
+• Board — verschieben Sie Ihre On-Chain-Guthaben in Ihr Ark-Guthaben, auf einmal oder in einem gewählten Betrag; Board-Transaktionen sind im Bewegungsverlauf mit „On-chain: Board“ gekennzeichnet.
+• barkd 0.4.0 macht On-Chain-Sendungen und Offboards absturzsicher und fortsetzbar: Ein unterbrochener Vorgang wird jetzt bei der nächsten Wallet-Synchronisierung wiederhergestellt, statt verloren zu gehen, und On-Chain-Sendungen mit Wechselgeld schlagen nicht mehr fehl.
+• Kraken ist jetzt die Standardquelle für den Bitcoin-Preis.
+
+Vollständiges Änderungsprotokoll: https://gitlab.com/ark-bitcoin/labs/bark-web/-/blob/v0.4.0/CHANGELOG.md`,
+    pl_PL: `Aktualizuje bark-web do v0.4.0 (barkd 0.4.0).
+
+• Board — przenieś swoje środki on-chain do salda Ark, w całości lub w wybranej kwocie; transakcje typu board są oznaczane etykietą „On-chain: Board” w historii ruchów.
+• barkd 0.4.0 sprawia, że wysyłki on-chain i offboardy są odporne na awarie i wznawialne: przerwana operacja jest teraz odzyskiwana przy następnej synchronizacji portfela zamiast zostać utracona, a wysyłki on-chain generujące resztę już nie zawodzą.
+• Kraken jest teraz domyślnym źródłem ceny Bitcoina.
+
+Pełny dziennik zmian: https://gitlab.com/ark-bitcoin/labs/bark-web/-/blob/v0.4.0/CHANGELOG.md`,
+    fr_FR: `Met à jour bark-web vers v0.4.0 (barkd 0.4.0).
+
+• Board — transférez vos fonds on-chain vers votre solde Ark, en totalité ou pour un montant choisi ; les transactions d'embarquement sont étiquetées « On-chain: Board » dans votre historique de mouvements.
+• barkd 0.4.0 rend les envois on-chain et les offboards résistants aux pannes et reprenables : une opération interrompue est désormais récupérée à la prochaine synchronisation du portefeuille au lieu d'être perdue, et les envois on-chain générant de la monnaie n'échouent plus.
+• Kraken est désormais la source de prix Bitcoin par défaut.
+
+Journal des modifications complet : https://gitlab.com/ark-bitcoin/labs/bark-web/-/blob/v0.4.0/CHANGELOG.md`,
   },
   migrations: {},
 })
