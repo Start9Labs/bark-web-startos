@@ -548,7 +548,6 @@ export const configureBackup = sdk.Action.withInput(
 
       if (provider === 'gdrive' || provider === 'dropbox') {
         const google = provider === 'gdrive'
-        const label = google ? 'Google Drive' : 'Dropbox'
         const clientId =
           o[`${provider}-client-id`]?.trim() || prev.clientId || ''
         const clientSecret =
