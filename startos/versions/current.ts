@@ -1,7 +1,7 @@
 import { VersionInfo } from '@start9labs/start-sdk'
 
 export const current = VersionInfo.of({
-  version: '0.4.0:0',
+  version: '0.4.0:1',
   releaseNotes: {
     en_US: `Updates bark-web to v0.4.0 (barkd 0.4.0).
 
