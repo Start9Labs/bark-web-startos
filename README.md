@@ -77,7 +77,7 @@ Package-level state on `/data`:
 
 ## Installation and First-Run Flow
 
-A `mkdir -p /data/.bark` oneshot runs before `barkd` starts on every launch. On first run the wallet is empty — the user creates or restores a wallet through the web UI.
+A `mkdir -p /data/.bark` oneshot runs before `barkd` starts on every launch. On first run the wallet is empty; the UI's root page auto-creates one (mnemonic generated in the browser, posted to `createWallet`) as soon as it loads and sees no wallet. Upstream's `/create` and `/import` pages exist but nothing links to them, so that auto-create is the only wallet-creation path a user can reach.
 
 The web interface is gated by the bark-web API's own native login page (the `UI_AUTH` gate — see [Authentication](#authentication)), not by edge basic auth. On init, a critical **Set UI Password** task is created whenever `/data/ui_password` is absent, so a fresh install cannot serve the wallet until the user generates a password (the API fails closed with `503` until the password file exists).
 
@@ -200,7 +200,7 @@ None. The package talks to the hosted Ark server and chain source over the inter
 
 ## What Is Unchanged from Upstream
 
-The `bark-web` UI and `barkd` daemon behave exactly as upstream documents — wallet creation, restore-from-seed, send/receive across Lightning/Ark/on-chain, background refreshes, and unilateral exit. Only the deployment (single StartOS service, hosted endpoints, Tor/LAN access) differs.
+The `bark-web` UI and `barkd` daemon behave exactly as upstream documents — automatic wallet creation, send/receive across Lightning/Ark/on-chain, background refreshes, and unilateral exit. Only the deployment (single StartOS service, hosted endpoints, Tor/LAN access) differs.
 
 ---
 

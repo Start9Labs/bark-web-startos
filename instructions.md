@@ -20,8 +20,8 @@ This package runs Bark on Bitcoin **mainnet**, connected to Second's hosted Ark 
    - a **critical** "Backup Safety" task explains how your wallet is backed up and asks you to acknowledge that you can lose funds without a current external backup and a safeguarded recovery phrase. This is required of everyone and clears only once you acknowledge it; and
    - an **important** task recommends adding an external target via **Configure Backups** (see [Backups](#backups) below), and clears once you do.
 3. Open the **Web UI** interface from the service's **Dashboard** tab and log in with those credentials.
-4. Choose **Create wallet** to generate a fresh twelve-word recovery phrase, or **Restore** to import an existing seed.
-5. Write the recovery phrase down and store it safely — it is the master key to your funds. With Bark, your seed alone is **not** enough to recover Ark and Lightning balances; your continuous backup is.
+4. Your wallet is created for you the first time the interface loads — there is nothing to choose, and a fresh twelve-word recovery phrase is generated on the spot.
+5. Go to **Settings** in the wallet, reveal your recovery phrase, and write it down and store it safely — it is the master key to your funds. With Bark, your seed alone is **not** enough to recover Ark and Lightning balances; your continuous backup is.
 6. Fund the wallet by receiving an on-chain deposit or an Ark payment.
 
 ## Using Bark Wallet
