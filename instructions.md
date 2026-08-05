@@ -21,7 +21,7 @@ This package runs Bark on Bitcoin **mainnet**, connected to Second's hosted Ark 
    - an **important** task recommends adding an external target via **Configure Backups** (see [Backups](#backups) below), and clears once you do.
 3. Open the **Web UI** interface from the service's **Dashboard** tab and log in with those credentials.
 4. Your wallet is created for you the first time the interface loads — there is nothing to choose, and a fresh twelve-word recovery phrase is generated on the spot.
-5. Go to **Settings** in the wallet, reveal your recovery phrase, and write it down and store it safely — it is the master key to your funds. With Bark, your seed alone is **not** enough to recover Ark and Lightning balances; your continuous backup is.
+5. Go to **Settings** in the wallet, reveal your recovery phrase, and write it down and store it safely — it is the master key to your funds, and it is what decrypts your backups. Your seed can now rebuild your Ark balance on its own, but only with the Ark server's help; your continuous backup is the copy that does not depend on anyone else.
 6. Fund the wallet by receiving an on-chain deposit or an Ark payment.
 
 ## Using Bark Wallet
@@ -32,7 +32,7 @@ The web UI is the whole experience: check your balance, send and receive across 
 
 ### Backups
 
-Bark is different from most wallets: **a stale backup loses funds.** Every Ark or Lightning payment advances the wallet state, so restoring an out-of-date copy rolls your wallet back to when that copy was taken — **any Ark or Lightning funds you received or moved since then can be permanently lost** (the Ark server cannot rebuild them, and your seed alone can't either). On-chain funds, and balances untouched since that moment, stay recoverable from your seed. That's why a backup only protects you if it is **current** when you restore it.
+Bark is different from most wallets: **a stale backup puts funds at risk.** Every Ark or Lightning payment advances the wallet state, so restoring an out-of-date copy rolls your wallet back to when that copy was taken. As of this version Bark tries to repair that gap on its own — on opening a wallet it rebuilds your spendable Ark balance from a recovery mailbox held by the Ark server — but that is a best-effort catch-up that needs the server to be reachable and willing, it is skipped for anything already spent or exited, and anything it cannot check is simply reported. Treat it as a safety net, not a guarantee. A **current** backup is still what actually protects you.
 
 Because of this, this package backs your wallet up **continuously** to a target you choose, instead of relying only on periodic StartOS backups.
 
@@ -47,7 +47,7 @@ A **local backup always runs** on this server automatically — no setup needed,
 1. **Your recovery phrase** — the master key. It decrypts your backups. If you lose it, nothing can recover your wallet.
 2. **A current StartOS backup** — small, and it stores *where* your wallet backups live plus the credentials to fetch them. Keep taking StartOS backups (the wallet database is no longer inside them — it lives at your chosen target — but the pointer to it is).
 
-**Restoring:** restore your StartOS backup as usual. On startup the service automatically pulls the **freshest** wallet snapshot from your target(s), decrypts it with your seed, and loads it — so you come back to your most recent state, not a stale one. (If no target was ever configured, or none can be reached, the wallet starts fresh from your seed with on-chain-only recovery.)
+**Restoring:** restore your StartOS backup as usual. On startup the service automatically pulls the **freshest** wallet snapshot from your target(s), decrypts it with your seed, and loads it — so you come back to your most recent state, not a stale one. (If no target was ever configured, or none can be reached, the wallet starts from your seed alone — on-chain funds, plus whatever Ark balance it can rebuild from the server's recovery mailbox.)
 
 > **Don't roll your backup target back to an older state**, and ideally use **two independent targets**. If you restore the target itself (e.g. your Nextcloud) from an old backup, the wallet copy on it becomes stale. The service detects this — if the newest copy it finds is older than what it last sent, it **refuses to load it** (to avoid reverting your wallet and losing funds) and asks you to provide a current copy. With two targets, a rolled-back one is simply outvoted by the fresh one.
 

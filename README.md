@@ -43,7 +43,7 @@ A single image runs three processes, each supervised independently by StartOS:
 
 | Daemon  | Command                                              | Internal Port | Role                                            |
 | ------- | ---------------------------------------------------- | ------------- | ----------------------------------------------- |
-| `barkd` | `barkd --port 4000 --host 127.0.0.1 --datadir /data/.bark` | 4000          | Wallet daemon (HTTP + WebSocket)                |
+| `barkd` | `barkd --port 4000 --host 127.0.0.1 --datadir /data/.bark --expose-mnemonic` | 4000          | Wallet daemon (HTTP + WebSocket). `--expose-mnemonic` is required from barkd 0.5.0 on, or Settings cannot reveal the recovery phrase — the only place a user can read it |
 | `api`   | `node /app/api/dist/index.js`                        | 4001          | Hono proxy; injects the barkd bearer token      |
 | `nginx` | `nginx -g 'daemon off;'`                             | 8080          | Serves the SPA, proxies `/api/` and `/barkd-ws/` |
 
@@ -153,7 +153,7 @@ The session signing secret lives at `/data/ui_session_secret` (generated atomica
 
 ## Backups and Restore
 
-A stale Bark database means **permanent fund loss** (forfeited input VTXOs become unspendable; VTXOs created after the snapshot are absent), and the Ark server cannot reconstruct wallet state from the seed today — so seed-only restore is *not* a recovery path. The native StartOS backup is point-in-time and stops the service, so it cannot capture a fast-moving wallet safely. This package therefore ships a **continuous external backup** and narrows the native backup to a pointer.
+A stale Bark database risks **permanent fund loss** (forfeited input VTXOs become unspendable; VTXOs created after the snapshot are absent). barkd 0.5.0 added a partial mitigation — a wallet posts its VTXO ids to a seed-derived recovery mailbox on the Ark server and rebuilds its spendable set from the seed on open — but it is best-effort and server-dependent: the scan is bounded so an uncooperative server cannot stall it, already-spent and exited VTXOs are skipped, and unverifiable VTXOs are only reported. So seed-only restore is now a *degraded* recovery path rather than none at all, and not a substitute for a current backup. The native StartOS backup is point-in-time and stops the service, so it cannot capture a fast-moving wallet safely. This package therefore ships a **continuous external backup** and narrows the native backup to a pointer.
 
 **Continuous backup (`backup-agent.sh`, the `backup-agent` daemon):** a sidecar watches `/data/.bark/db.sqlite` with `inotifywait` (plus an unconditional ~5-minute backstop timer). On any change it debounces, takes a consistent snapshot with `sqlite3 VACUUM INTO`, skips if the snapshot hash is unchanged, encrypts via an rclone `crypt` remote whose password is derived from the wallet mnemonic (`HMAC-SHA256(mnemonic, context)`), and `rclone copy`s the ciphertext to every enabled target. Status is written to `/data/.bark/.backup-state.json`.
 
