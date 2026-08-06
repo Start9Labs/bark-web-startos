@@ -70,6 +70,13 @@ export const main = sdk.setupMain(async ({ effects }) => {
           '127.0.0.1',
           '--datadir',
           walletDir,
+          // barkd 0.5.0 made GET /api/v1/wallet/mnemonic opt-in, 404 by
+          // default. Upstream's /create and /import pages are unreachable, so
+          // the wallet's Settings screen is the only way a user can ever read
+          // their recovery phrase — without this they could never record it.
+          // The endpoint is reachable only through the API's session-guarded
+          // barkd proxy, on a daemon bound to loopback behind a bearer token.
+          '--expose-mnemonic',
         ],
       },
       ready: {
