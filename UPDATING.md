@@ -5,7 +5,12 @@ This package wraps two upstream artifacts from the [ark-bitcoin](https://gitlab.
 - **`bark-web`** — the frontend GUI and its API proxy, built from a git tag (`BARK_WEB_VERSION`).
 - **`barkd`** — the wallet daemon, fetched as a release binary with a pinned SHA-256 (`BARK_VERSION`).
 
-The two are versioned independently, but the `bark-web` frontend bundles a `@secondts/barkd` JS client that must match the `barkd` daemon. Keep `BARK_VERSION` aligned with the client version `bark-web` ships.
+The two are versioned independently, but the `bark-web` frontend bundles a `@secondts/barkd` JS client that must match the `barkd` daemon. Keep `BARK_VERSION` aligned with the client version `bark-web` ships — the client is generated from the daemon's OpenAPI spec, so a daemon patch release is only safe ahead of the client if `bark-rest/openapi.json` is unchanged between the two tags apart from its `version` string:
+
+```sh
+curl -s 'https://gitlab.com/api/v4/projects/ark-bitcoin%2Fbark/repository/compare?from=bark-<old>&to=bark-<new>' \
+  | jq -r '.diffs[] | select(.new_path=="bark-rest/openapi.json") | .diff'
+```
 
 ## Determining the upstream versions
 
