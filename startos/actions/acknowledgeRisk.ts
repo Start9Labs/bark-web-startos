@@ -12,7 +12,7 @@ Every time your wallet changes (a payment, an Ark round, an on-chain movement), 
 <ul>
 <li><b>Add an external target</b> (Configure Backups). The on-box local backup alone survives only inside a manual StartOS backup, so it's usually stale when you need it.</li>
 <li><b>Take a StartOS backup afterward</b> (System → Create Backup) and keep its <b>StartOS master password</b>. That backup holds your seed and the pointer to your target; without it a restore can't find your target and comes back stale. Re-take it whenever you change targets.</li>
-<li><b>Safeguard your Bark 12-word recovery phrase</b></li>
+<li><b>Record your Bark 12-word recovery phrase now</b> — open the wallet, go to <b>Settings</b>, and reveal it. Your wallet is created for you automatically the first time the interface loads, so the phrase is never shown to you unprompted; you have to go and get it.</li>
 </ul>
 Your web login password is separate and can be regenerated — it isn't a recovery secret. By accepting, you understand you can permanently lose funds without a current external backup, your recovery phrase, and your StartOS master password.`
 
