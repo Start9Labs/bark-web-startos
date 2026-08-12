@@ -6,7 +6,8 @@
     "check": "tsc --noEmit"
   },
   "dependencies": {
-    "@start9labs/start-sdk": "2.0.9"
+    "@start9labs/start-sdk": "2.0.9",
+    "bitcoin-core-startos": "github:Start9Labs/bitcoin-core-startos#next/29.x"
   },
   "devDependencies": {
     "@types/node": "^22.19.0",

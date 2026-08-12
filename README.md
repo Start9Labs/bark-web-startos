@@ -95,10 +95,25 @@ Ongoing protection is surfaced by the **Wallet Backup** health check: **failure*
 | StartOS-Managed (baked into the image)                          | Upstream-Managed                          |
 | --------------------------------------------------------------- | ----------------------------------------- |
 | Ark server `https://ark.second.tech`                            | Wallet creation, send/receive, refreshes  |
-| Chain source `https://mempool.second.tech/api`                  | (everything else via the bark-web UI)     |
+| Chain source — the local `bitcoind` RPC bridge address          | (everything else via the bark-web UI)     |
 | Network `mainnet`                                               |                                           |
 
-These three values are passed to the API daemon as environment variables (`ARK_SERVER`, `CHAIN_SOURCE`, `BARK_NETWORK`). There is no StartOS config form; to change them, edit `startos/utils.ts` and rebuild.
+The Ark server and network are baked into the image and passed to the API daemon as `ARK_SERVER` / `BARK_NETWORK`. There is no StartOS config form; to change them, edit `startos/utils.ts` and rebuild.
+
+The chain source is resolved at runtime instead: `bitcoindRpcUrl()` reads bitcoind's RPC bridge address reactively, so main re-runs and repins it whenever the address changes.
+
+### Chain Source
+
+Chain data — the on-chain wallet scan, tip height, transaction status, fee estimates and broadcasts — comes from the user's own `bitcoind` over RPC. Nothing is read from a third-party explorer, so the wallet follows whichever consensus rules the user chose to run, including in a chain split.
+
+bark-web v0.5.0 added deployment-configurable chain sources, so this needs no patching of upstream: the API daemon gets `BITCOIND_RPC_URL` and `BITCOIND_RPC_COOKIE_FILE`, builds a bitcoind `ChainSourceConfig` from them, and the SPA forwards it verbatim to barkd. `CHAIN_SOURCE` is deliberately left unset — with both present the API warns and discards it. The cookie is read by **barkd**, not the API (which never stats it), so bitcoind's `main` volume is mounted read-only at `/mnt/bitcoind` in the `barkd-sub` subcontainer only.
+
+**The chain source is only set at wallet creation.** barkd persists it in `/data/.bark/config.toml`, re-reads it on every start, and exposes no endpoint to change it afterwards — so a wallet created against the hosted explorer can only be moved by rewriting that file, which `setupMain` does before barkd opens the wallet. Two behaviors make that rewrite what it is, both verified against barkd:
+
+- With both `esplora_address` and `bitcoind_address` set, barkd uses **esplora** — it dials `GET /block-height/0` and ignores the bitcoind keys. So the rewrite **deletes** `esplora_address` rather than merely adding the bitcoind keys.
+- It only fires when `config.toml` already exists. An absent file means no wallet yet and must stay absent: barkd rejects creation with `Cannot provide an existing config file and config flags`, and the create request always carries them.
+
+The same rewrite heals a changed bitcoind bridge address and a restore onto a different server.
 
 ---
 
@@ -180,6 +195,7 @@ We chose inotify-on-the-DB over barkd's WebSocket movement stream deliberately: 
 | ------------- | --------------------- | -------- | ------------------------------------------------------------- |
 | Web Interface | Port listening (8080) | Yes      | "The web interface is ready" / "The web interface is not ready" |
 | Wallet Backup | Reads `backup-config.json` + `.backup-state.json` | Yes | `failure` (no external target enabled), `success` ("Last backup Nm ago" once shipping; "no backup yet" until the wallet has activity), `failure` (external enabled but backups erroring — names the specific failing target and reason, e.g. `nextcloud: certificate signed by unknown authority`) |
+| Chain Source  | Reports the resolved `bitcoind` RPC address | Yes | `success` ("Your Bitcoin node, over RPC at …"), `failure` (address unresolved — Bitcoin absent, or pruned so RPC is loopback-only) |
 
 `barkd` (4000), `api` (4001), and the `backup-agent` daemon readiness gate startup ordering but are not displayed directly; backup health is surfaced via the standalone **Wallet Backup** check.
 
@@ -187,7 +203,16 @@ We chose inotify-on-the-DB over barkd's WebSocket movement stream deliberately: 
 
 ## Dependencies
 
-None. The package talks to the hosted Ark server and chain source over the internet; it does not depend on a local Bitcoin node.
+| Dependency | Required | Health Checks              | Version Range | Purpose                |
+| ---------- | -------- | -------------------------- | ------------- | ---------------------- |
+| Bitcoin    | Yes      | `bitcoind`, `sync-progress` | see below     | Chain source, over RPC |
+
+Two constraints drive that row:
+
+- **Archival only.** `bitcoin.conf` binds RPC to `127.0.0.1:58332` with `rpcallowip=127.0.0.1/32` when pruning is on, so a pruned node exposes nothing over the LXC bridge and the wallet would have no chain source at all. `dependencies.ts` therefore raises a **critical** `autoconfig` task requiring `prune: 0`. `txindex` is _not_ required — barkd syncs via `bdk_bitcoind_rpc`, which walks blocks rather than looking transactions up by id.
+- **Bitcoin 29.0 or later, floored per line.** Below 29.0 barkd can join Ark rounds but cannot unilaterally exit ("Bitcoin Core version is too old… Please upgrade to 29.0 or higher"), which would leave funds recoverable only with the Ark server's cooperation. The range is `(>=29.4:4 && <30) || (>=30.3:4 && <31) || >=31.1:4` rather than a flat `>=29.4:4`: exver sorts 30.x and 31.x above 29.4:4, so a flat floor would also admit stale builds on those lines — including ones predating `prune=0`, where the autoconfig task above opens a form seeded with 0 against a hardcoded minimum of 550 and `input-not-matches` re-raises it forever. Knots resolves through its `.satisfies()` claim on the 29.x line.
+
+The hosted Ark server (`ark.second.tech`) remains: Ark is a two-party protocol and the server is inherent to it, not a substitutable data source.
 
 ---
 
@@ -195,7 +220,8 @@ None. The package talks to the hosted Ark server and chain source over the inter
 
 1. **Mainnet only** — the Ark server, chain source, and network are fixed to Second's hosted mainnet endpoints. Signet / regtest are not selectable.
 2. **No StartOS config form** — the hosted endpoints are baked into the image, not editable from the StartOS UI.
-3. **Requires internet** — Ark rounds and chain data come from `ark.second.tech` and `mempool.second.tech`.
+3. **Requires an archival Bitcoin node** — see [Dependencies](#dependencies). A pruned node cannot serve RPC to other services.
+4. **Requires internet for Ark** — Ark rounds go to `ark.second.tech`. Chain data does not leave the server.
 
 ---
 
@@ -218,7 +244,11 @@ ports:
   ui: 8080      # gated by the bark-web API's native login page (UI_AUTH); no edge basic-auth
   barkd: 4000   # localhost only, not exposed
   api: 4001     # localhost only, not exposed
-dependencies: none
+dependencies:
+  bitcoind: { required: true, version_range: '(>=29.4:4 && <30) || (>=30.3:4 && <31) || >=31.1:4', health_checks: [bitcoind, sync-progress] }
+    # chain source over RPC; MUST be archival (prune=0) — pruned binds RPC to loopback only
+    # txindex NOT needed (barkd walks blocks via bdk_bitcoind_rpc)
+    # >=29.0 required for unilateral exit
 daemons: [barkd, api, nginx, backup-agent]   # backup-agent: continuous encrypted external backup
 backup_targets: { local: always-on (on-box, in native backup), external: [gdrive, dropbox, nextcloud, sftp] }   # via bundled rclone; loopback/.onion rejected
 startos_managed_env_vars:
@@ -227,7 +257,8 @@ startos_managed_env_vars:
   - WALLET_DATA_PATH
   - BARKD_URL
   - ARK_SERVER
-  - CHAIN_SOURCE
+  - BITCOIND_RPC_URL          # local bitcoind RPC bridge address; CHAIN_SOURCE deliberately unset
+  - BITCOIND_RPC_COOKIE_FILE  # /mnt/bitcoind/.cookie — read by barkd, not the api
   - BARK_NETWORK
   - HOST               # 127.0.0.1 — API binds localhost only
   - UI_AUTH            # 'true' — enables the native login gate (also baked into the image)
