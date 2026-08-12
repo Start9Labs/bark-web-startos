@@ -1,3 +1,7 @@
+import { T } from '@start9labs/start-sdk'
+import { rpcHostId, rpcPort } from 'bitcoin-core-startos/startos/utils'
+import { sdk } from './sdk'
+
 export const uiPort = 8080
 export const apiPort = 4001
 export const barkdPort = 4000
@@ -31,5 +35,36 @@ export const backupFolderDefault = 'bark-backups'
 export const localBackupPath = '/data/local-backups'
 
 export const arkServer = 'https://ark.second.tech'
-export const chainSource = 'https://mempool.second.tech/api'
 export const barkNetwork = 'mainnet'
+
+// barkd's wallet config, written by barkd at wallet creation and re-read on
+// every start. main.ts rewrites its chain-source keys before barkd opens the
+// wallet — bark-web only sets the chain source at creation.
+export const configTomlSubpath = '.bark/config.toml'
+
+// bitcoind's data volume, mounted read-only into the barkd subcontainer so
+// barkd can read the RPC cookie itself.
+export const btcMountpoint = '/mnt/bitcoind'
+export const btcCookiePath = `${btcMountpoint}/.cookie`
+
+/**
+ * bitcoind's RPC bridge address as a URL (`http://<osIp>:8332`) — the chain
+ * source barkd syncs from. `null` while bitcoind is absent; callers then leave
+ * the chain source unwritten rather than pinning a fake address, and the
+ * `.const()` heals when bitcoind reappears.
+ *
+ * Only an archival node is reachable here: bitcoin.conf binds RPC to
+ * `127.0.0.1:58332` with `rpcallowip=127.0.0.1/32` when pruned, so the bridge
+ * resolves to nothing. Hence the `prune: 0` task in dependencies.ts.
+ */
+export const bitcoindRpcUrl = async (effects: T.Effects) => {
+  const bridge = await sdk.host
+    .getBridgeAddress(effects, {
+      packageId: 'bitcoind',
+      hostId: rpcHostId,
+      internalPort: rpcPort,
+      ssl: false,
+    })
+    .const()
+  return bridge && `http://${bridge}`
+}
