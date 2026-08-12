@@ -1,53 +1,48 @@
 import { VersionInfo } from '@start9labs/start-sdk'
 
 export const current = VersionInfo.of({
-  version: '0.7.2:0',
+  version: '0.7.2:1',
   releaseNotes: {
-    en_US: `Updates bark-web to v0.7.2 and the wallet daemon to bark v0.6.1. A bugfix and security release, recommended for everyone.
+    en_US: `The wallet now syncs from your own Bitcoin node instead of a third-party block explorer.
 
-• Sending no longer reports "insufficient funds" while an earlier send is still going through.
-• On-chain sends could fail when your wallet and the Ark server priced the same coins in a different order. Both sides now calculate the fee the same way.
-• Refreshes that were scheduled before v0.6.0 could not be completed; they now finish normally.
-• Revealing your recovery phrase now goes through a dedicated endpoint that requires you to be logged in, and the wallet daemon's recovery-phrase route is no longer reachable through the app's proxy.
-• The Backup Safety task now tells you where your recovery phrase is. Your wallet is created for you automatically, so the phrase is never shown to you unprompted — you reveal it in Settings.
+• Bitcoin is now a required dependency, and chain data — balances, transaction status, fee estimates, broadcasts — comes from it over RPC. Previously the wallet read the chain from a hosted explorer (mempool.second.tech), which meant trusting someone else's view of Bitcoin and, in a chain split, following their consensus rules rather than the ones you chose to run.
+• Existing wallets move over automatically on first start; your balance, VTXOs, and history are untouched.
+• Your node must be archival (pruning disabled) — Bitcoin only exposes RPC to other services when it is. StartOS will prompt you if pruning is on.
+• Bitcoin 29.0 or later is required. Below that, the wallet can join Ark rounds but cannot unilaterally exit.
 
-Full changelog: https://gitlab.com/ark-bitcoin/labs/bark-web/-/blob/v0.7.2/CHANGELOG.md`,
-    es_ES: `Actualiza bark-web a v0.7.2 y el demonio del monedero a bark v0.6.1. Una versión de correcciones y seguridad, recomendada para todos.
+The Ark server (ark.second.tech) is unchanged — Ark is a two-party protocol and the server is inherent to it.`,
+    es_ES: `El monedero ahora se sincroniza con tu propio nodo de Bitcoin en lugar de un explorador de bloques de terceros.
 
-• Al enviar ya no aparece «fondos insuficientes» mientras un envío anterior sigue en curso.
-• Los envíos en cadena podían fallar cuando tu monedero y el servidor Ark valoraban las mismas monedas en distinto orden. Ahora ambos calculan la comisión de la misma manera.
-• Las renovaciones programadas antes de v0.6.0 no podían completarse; ahora finalizan con normalidad.
-• Mostrar tu frase de recuperación ahora pasa por un punto de acceso específico que exige haber iniciado sesión, y la ruta de la frase de recuperación del demonio ya no es accesible a través del proxy de la aplicación.
-• La tarea «Backup Safety» ahora te dice dónde está tu frase de recuperación. Tu monedero se crea automáticamente, así que la frase nunca se te muestra sin que la pidas: la revelas en Ajustes.
+• Bitcoin es ahora una dependencia obligatoria, y los datos de la cadena —saldos, estado de transacciones, estimaciones de comisiones, difusiones— provienen de él mediante RPC. Antes el monedero leía la cadena desde un explorador alojado (mempool.second.tech), lo que implicaba confiar en la visión de Bitcoin de otra persona y, en una división de cadena, seguir sus reglas de consenso en lugar de las que tú elegiste ejecutar.
+• Los monederos existentes se migran automáticamente en el primer inicio; tu saldo, VTXOs e historial permanecen intactos.
+• Tu nodo debe ser de archivo (poda desactivada) — Bitcoin solo expone RPC a otros servicios en ese caso. StartOS te avisará si la poda está activada.
+• Se requiere Bitcoin 29.0 o posterior. Por debajo de esa versión, el monedero puede participar en rondas Ark pero no puede salir unilateralmente.
 
-Registro de cambios completo: https://gitlab.com/ark-bitcoin/labs/bark-web/-/blob/v0.7.2/CHANGELOG.md`,
-    de_DE: `Aktualisiert bark-web auf v0.7.2 und den Wallet-Daemon auf bark v0.6.1. Eine Fehlerbehebungs- und Sicherheitsversion, für alle empfohlen.
+El servidor Ark (ark.second.tech) no cambia — Ark es un protocolo de dos partes y el servidor es inherente a él.`,
+    de_DE: `Das Wallet synchronisiert jetzt mit deinem eigenen Bitcoin-Knoten statt mit einem Block-Explorer eines Drittanbieters.
 
-• Beim Senden erscheint nicht mehr „unzureichendes Guthaben“, während eine frühere Sendung noch läuft.
-• On-Chain-Sendungen konnten fehlschlagen, wenn dein Wallet und der Ark-Server dieselben Coins in unterschiedlicher Reihenfolge bepreisten. Beide Seiten berechnen die Gebühr jetzt gleich.
-• Vor v0.6.0 geplante Auffrischungen ließen sich nicht abschließen; sie werden jetzt normal beendet.
-• Das Anzeigen deiner Wiederherstellungsphrase läuft jetzt über einen eigenen Endpunkt, der eine Anmeldung voraussetzt, und die Wiederherstellungsphrasen-Route des Daemons ist über den Proxy der App nicht mehr erreichbar.
-• Die Aufgabe „Backup Safety“ sagt dir jetzt, wo deine Wiederherstellungsphrase ist. Dein Wallet wird automatisch erstellt, daher wird dir die Phrase nie unaufgefordert angezeigt — du zeigst sie in den Einstellungen an.
+• Bitcoin ist nun eine erforderliche Abhängigkeit, und Chain-Daten — Guthaben, Transaktionsstatus, Gebührenschätzungen, Broadcasts — kommen per RPC von dort. Zuvor las das Wallet die Chain von einem gehosteten Explorer (mempool.second.tech), was bedeutete, der Bitcoin-Sicht eines anderen zu vertrauen und bei einer Chain-Spaltung dessen Konsensregeln zu folgen statt denen, die du selbst betreibst.
+• Bestehende Wallets werden beim ersten Start automatisch umgestellt; Guthaben, VTXOs und Verlauf bleiben unberührt.
+• Dein Knoten muss archivierend sein (Pruning deaktiviert) — nur dann stellt Bitcoin RPC für andere Dienste bereit. StartOS fragt nach, wenn Pruning aktiv ist.
+• Bitcoin 29.0 oder neuer ist erforderlich. Darunter kann das Wallet an Ark-Runden teilnehmen, aber nicht einseitig aussteigen.
 
-Vollständiges Änderungsprotokoll: https://gitlab.com/ark-bitcoin/labs/bark-web/-/blob/v0.7.2/CHANGELOG.md`,
-    pl_PL: `Aktualizuje bark-web do v0.7.2, a demona portfela do bark v0.6.1. Wydanie z poprawkami i ulepszeniami bezpieczeństwa, zalecane dla wszystkich.
+Der Ark-Server (ark.second.tech) bleibt unverändert — Ark ist ein Zwei-Parteien-Protokoll, und der Server gehört dazu.`,
+    pl_PL: `Portfel synchronizuje się teraz z Twoim własnym węzłem Bitcoin, a nie z zewnętrzną przeglądarką bloków.
 
-• Podczas wysyłki nie pojawia się już komunikat o niewystarczających środkach, gdy wcześniejsza wysyłka jest wciąż w toku.
-• Wysyłki on-chain mogły się nie powieść, gdy Twój portfel i serwer Ark wyceniały te same monety w innej kolejności. Obie strony liczą teraz opłatę tak samo.
-• Odświeżenia zaplanowane przed v0.6.0 nie mogły zostać ukończone; teraz kończą się normalnie.
-• Ujawnienie frazy odzyskiwania odbywa się teraz przez dedykowany punkt końcowy wymagający zalogowania, a trasa frazy odzyskiwania w demonie nie jest już dostępna przez proxy aplikacji.
-• Zadanie „Backup Safety” mówi teraz, gdzie jest Twoja fraza odzyskiwania. Portfel tworzy się automatycznie, więc fraza nigdy nie jest pokazywana bez pytania — ujawniasz ją w Ustawieniach.
+• Bitcoin jest teraz wymaganą zależnością, a dane łańcucha — salda, status transakcji, szacowanie opłat, rozgłaszanie — pochodzą z niego przez RPC. Wcześniej portfel czytał łańcuch z hostowanej przeglądarki (mempool.second.tech), co oznaczało zaufanie cudzemu widokowi Bitcoina i, w razie podziału łańcucha, podążanie za jego regułami konsensusu zamiast tych, które sam uruchamiasz.
+• Istniejące portfele są migrowane automatycznie przy pierwszym uruchomieniu; saldo, VTXO i historia pozostają nietknięte.
+• Twój węzeł musi być archiwalny (przycinanie wyłączone) — tylko wtedy Bitcoin udostępnia RPC innym usługom. StartOS poprosi Cię o zmianę, jeśli przycinanie jest włączone.
+• Wymagany jest Bitcoin 29.0 lub nowszy. Poniżej tej wersji portfel może uczestniczyć w rundach Ark, ale nie może wyjść jednostronnie.
 
-Pełny dziennik zmian: https://gitlab.com/ark-bitcoin/labs/bark-web/-/blob/v0.7.2/CHANGELOG.md`,
-    fr_FR: `Met à jour bark-web vers v0.7.2 et le démon du portefeuille vers bark v0.6.1. Une version de correctifs et de sécurité, recommandée pour tous.
+Serwer Ark (ark.second.tech) pozostaje bez zmian — Ark jest protokołem dwustronnym i serwer jest jego nieodłączną częścią.`,
+    fr_FR: `Le portefeuille se synchronise désormais avec votre propre nœud Bitcoin plutôt qu'avec un explorateur de blocs tiers.
 
-• L'envoi n'indique plus « fonds insuffisants » tant qu'un envoi précédent est encore en cours.
-• Les envois on-chain pouvaient échouer lorsque votre portefeuille et le serveur Ark valorisaient les mêmes pièces dans un ordre différent. Les deux calculent désormais les frais de la même façon.
-• Les rafraîchissements programmés avant la v0.6.0 ne pouvaient pas aboutir ; ils se terminent maintenant normalement.
-• L'affichage de votre phrase de récupération passe désormais par un point d'accès dédié qui exige d'être connecté, et la route de la phrase de récupération du démon n'est plus accessible via le proxy de l'application.
-• La tâche « Backup Safety » vous indique désormais où se trouve votre phrase de récupération. Votre portefeuille est créé automatiquement, la phrase ne vous est donc jamais montrée spontanément — vous la révélez dans les Paramètres.
+• Bitcoin est maintenant une dépendance requise, et les données de la chaîne — soldes, statut des transactions, estimations de frais, diffusions — en proviennent via RPC. Auparavant le portefeuille lisait la chaîne depuis un explorateur hébergé (mempool.second.tech), ce qui impliquait de faire confiance à la vision de Bitcoin d'un tiers et, lors d'une scission de chaîne, de suivre ses règles de consensus plutôt que celles que vous avez choisi d'exécuter.
+• Les portefeuilles existants sont basculés automatiquement au premier démarrage ; votre solde, vos VTXO et votre historique restent intacts.
+• Votre nœud doit être d'archive (élagage désactivé) — Bitcoin n'expose RPC aux autres services que dans ce cas. StartOS vous le signalera si l'élagage est actif.
+• Bitcoin 29.0 ou ultérieur est requis. En dessous, le portefeuille peut participer aux tours Ark mais ne peut pas sortir unilatéralement.
 
-Journal des modifications complet : https://gitlab.com/ark-bitcoin/labs/bark-web/-/blob/v0.7.2/CHANGELOG.md`,
+Le serveur Ark (ark.second.tech) est inchangé — Ark est un protocole bipartite et le serveur en fait partie intégrante.`,
   },
   migrations: {},
 })

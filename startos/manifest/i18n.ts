@@ -16,5 +16,17 @@ export const long = {
   pl_PL:
     'Bark to samodzielny portfel Bitcoin oparty na protokole Ark. Wysyłaj i odbieraj Bitcoin poza łańcuchem za pomocą rund Ark, aby uzyskać szybkie, tanie płatności, zachowując jednostronne wyjście do łańcucha bazowego. Pakiet łączy się z hostowanym serwerem Ark (ark.second.tech) i źródłem łańcucha (mempool.second.tech) w sieci głównej Bitcoin. Wszystkie klucze pozostają w wolumenie portfela na Twoim serwerze.',
   fr_FR:
-    "Bark est un portefeuille Bitcoin auto-hébergé fondé sur le protocole Ark. Envoyez et recevez des Bitcoin hors chaîne via des tours Ark pour des paiements rapides et peu coûteux, tout en conservant une sortie unilatérale vers la chaîne de base. Le paquet se connecte à un serveur Ark hébergé (ark.second.tech) et à une source de chaîne (mempool.second.tech) sur le réseau principal Bitcoin. Toutes les clés restent dans le volume du portefeuille sur votre serveur.",
+    'Bark est un portefeuille Bitcoin auto-hébergé fondé sur le protocole Ark. Envoyez et recevez des Bitcoin hors chaîne via des tours Ark pour des paiements rapides et peu coûteux, tout en conservant une sortie unilatérale vers la chaîne de base. Le paquet se connecte à un serveur Ark hébergé (ark.second.tech) et à une source de chaîne (mempool.second.tech) sur le réseau principal Bitcoin. Toutes les clés restent dans le volume du portefeuille sur votre serveur.',
+}
+
+export const bitcoindDescription = {
+  en_US: 'Provides the chain data the wallet syncs from, over RPC.',
+  es_ES:
+    'Proporciona los datos de la cadena que el monedero sincroniza, mediante RPC.',
+  de_DE:
+    'Liefert per RPC die Chain-Daten, mit denen das Wallet synchronisiert.',
+  pl_PL:
+    'Dostarcza dane łańcucha, z których synchronizuje się portfel, przez RPC.',
+  fr_FR:
+    'Fournit, via RPC, les données de chaîne à partir desquelles le portefeuille se synchronise.',
 }

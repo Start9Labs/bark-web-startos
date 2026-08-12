@@ -1,5 +1,7 @@
+import { manifest as bitcoinManifest } from 'bitcoin-core-startos/startos/manifest'
 import { backupConfigJson } from './fileModels/backupConfig.json'
 import { backupStateJson } from './fileModels/backupState.json'
+import { barkConfigToml } from './fileModels/barkConfig.toml'
 import { uiPasswordFile } from './fileModels/uiPassword'
 import { i18n } from './i18n'
 import { sdk } from './sdk'
@@ -9,7 +11,9 @@ import {
   backupAgentScript,
   barkdPort,
   barkNetwork,
-  chainSource,
+  bitcoindRpcUrl,
+  btcCookiePath,
+  btcMountpoint,
   uiPasswordPath,
   uiSessionSecretPath,
   uiPort,
@@ -31,6 +35,40 @@ export const main = sdk.setupMain(async ({ effects }) => {
   // takes effect and drops existing sessions.
   await uiPasswordFile.read().const(effects)
 
+  // Reactive: main re-runs when bitcoind's bridge address changes, so a
+  // reinstall or port change repins the chain source below.
+  const rpcUrl = await bitcoindRpcUrl(effects)
+
+  // Point an existing wallet at the local node before barkd opens it. bark-web
+  // sets the chain source only at wallet creation and barkd exposes no endpoint
+  // to change it afterwards, so config.toml is the only route for a wallet
+  // created against the hosted explorer. It also heals a stale bitcoind bridge
+  // address or a restore onto a different server. `esplora_address` has to go
+  // rather than simply be joined by the bitcoind keys — barkd prefers esplora
+  // when both are set.
+  //
+  // No config.toml means no wallet yet: leave it absent, because barkd rejects
+  // wallet creation outright ("Cannot provide an existing config file and config
+  // flags") when a config file and request-level config flags both exist, and
+  // the create request always carries them.
+  if (rpcUrl) {
+    const config = await barkConfigToml.read().once()
+    if (
+      config &&
+      (config.esplora_address !== undefined ||
+        config.bitcoind_address !== rpcUrl ||
+        config.bitcoind_cookiefile !== btcCookiePath)
+    ) {
+      const { esplora_address, bitcoind_user, bitcoind_pass, ...barkdOwned } =
+        config
+      await barkConfigToml.write(effects, {
+        ...barkdOwned,
+        bitcoind_address: rpcUrl,
+        bitcoind_cookiefile: btcCookiePath,
+      })
+    }
+  }
+
   const mounts = sdk.Mounts.of().mountVolume({
     volumeId: 'main',
     subpath: null,
@@ -38,10 +76,18 @@ export const main = sdk.setupMain(async ({ effects }) => {
     readonly: false,
   })
 
+  // barkd authenticates to bitcoind with its cookie, so it alone needs
+  // bitcoind's data volume.
   const barkdSub = sdk.SubContainer.of(
     effects,
     { imageId: 'bark' },
-    mounts,
+    mounts.mountDependency<typeof bitcoinManifest>({
+      dependencyId: 'bitcoind',
+      volumeId: 'main',
+      subpath: null,
+      mountpoint: btcMountpoint,
+      readonly: true,
+    }),
     'barkd-sub',
   )
 
@@ -106,7 +152,12 @@ export const main = sdk.setupMain(async ({ effects }) => {
           WALLET_DATA_PATH: walletDataPath,
           BARKD_URL: `http://127.0.0.1:${barkdPort}`,
           ARK_SERVER: arkServer,
-          CHAIN_SOURCE: chainSource,
+          // bark-web builds a bitcoind ChainSourceConfig from these two and
+          // ignores CHAIN_SOURCE entirely, so CHAIN_SOURCE is left unset rather
+          // than passed alongside — with both, the api warns and discards it.
+          // The cookie is read by barkd, not the api, which never stats it.
+          BITCOIND_RPC_URL: rpcUrl ?? '',
+          BITCOIND_RPC_COOKIE_FILE: btcCookiePath,
           BARK_NETWORK: barkNetwork,
           UI_AUTH: 'true',
           UI_PASSWORD_FILE: uiPasswordPath,
@@ -156,6 +207,26 @@ export const main = sdk.setupMain(async ({ effects }) => {
         fn: async () => ({ result: 'success', message: 'Active' }),
       },
       requires: ['barkd'],
+    })
+    .addHealthCheck('chain-source', {
+      // The point of this package's chain source is that you can see whose node
+      // it is, so surface it rather than leaving an unresolved address to
+      // manifest as barkd sync failures.
+      ready: {
+        display: 'Chain Source',
+        fn: async () =>
+          rpcUrl
+            ? {
+                result: 'success',
+                message: `Your Bitcoin node, over RPC at ${rpcUrl}`,
+              }
+            : {
+                result: 'failure',
+                message:
+                  'Bitcoin is unreachable, so the wallet has no chain source. Bitcoin only exposes RPC to other services when pruning is disabled — check that it is running as an archival node.',
+              },
+      },
+      requires: [],
     })
     .addHealthCheck('backup-status', {
       ready: {

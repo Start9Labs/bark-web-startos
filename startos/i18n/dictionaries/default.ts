@@ -13,9 +13,11 @@ const dict = {
 
   // actions/setUiPassword.ts, init/initializeService.ts
   'Set UI Password': 6,
-  'Generate a new password for logging in to the Bark Wallet web interface. Rotating it also signs out any active sessions.':
-    7,
+  'Generate a new password for logging in to the Bark Wallet web interface. Rotating it also signs out any active sessions.': 7,
   'Generate a password to log in to the Bark Wallet web interface': 8,
+
+  // dependencies.ts
+  'Bark syncs from Bitcoin over RPC, which requires an archival node': 9,
 } as const
 
 /**
