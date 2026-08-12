@@ -74,8 +74,9 @@ export const main = sdk.setupMain(async ({ effects }) => {
           // default. Upstream's /create and /import pages are unreachable, so
           // the wallet's Settings screen is the only way a user can ever read
           // their recovery phrase — without this they could never record it.
-          // The endpoint is reachable only through the API's session-guarded
-          // barkd proxy, on a daemon bound to loopback behind a bearer token.
+          // From bark-web 0.7.2 the endpoint is reachable only through the
+          // API's session-guarded POST /api/reveal-mnemonic, on a daemon bound
+          // to loopback behind a bearer token.
           '--expose-mnemonic',
         ],
       },
