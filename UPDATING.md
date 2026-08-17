@@ -39,5 +39,6 @@ curl -s 'https://gitlab.com/api/v4/projects/ark-bitcoin%2Fbark/repository/compar
    ```
 
    Put the `x86_64` hash in `BARKD_SHA256_AMD64` and the `arm64` hash in `BARKD_SHA256_ARM64`.
+
 3. Bump `version` and `releaseNotes` in `startos/versions/current.ts`.
 4. Run `make` and verify the build succeeds.

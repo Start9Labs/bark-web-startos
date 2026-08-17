@@ -45,7 +45,7 @@ A **local backup always runs** on this server automatically — no setup needed,
 **Your backups are encrypted before they leave your server**, with a key derived from your twelve-word recovery phrase, so they are safe to store on third-party services. Two things keep your funds recoverable, and you must keep both:
 
 1. **Your recovery phrase** — the master key. It decrypts your backups. If you lose it, nothing can recover your wallet.
-2. **A current StartOS backup** — small, and it stores *where* your wallet backups live plus the credentials to fetch them. Keep taking StartOS backups (the wallet database is no longer inside them — it lives at your chosen target — but the pointer to it is).
+2. **A current StartOS backup** — small, and it stores _where_ your wallet backups live plus the credentials to fetch them. Keep taking StartOS backups (the wallet database is no longer inside them — it lives at your chosen target — but the pointer to it is).
 
 **Restoring:** restore your StartOS backup as usual. On startup the service automatically pulls the **freshest** wallet snapshot from your target(s), decrypts it with your seed, and loads it — so you come back to your most recent state, not a stale one. (If no target was ever configured, or none can be reached, the wallet starts from your seed alone — on-chain funds, plus whatever Ark balance it can rebuild from the server's recovery mailbox.)
 
