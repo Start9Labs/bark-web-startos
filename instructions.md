@@ -1,6 +1,6 @@
 # Bark Wallet
 
-This package runs Bark on Bitcoin **mainnet**, reading the blockchain from your own Bitcoin node and connecting to Second's hosted Ark server for payments. Funds are real bitcoin — back up your recovery phrase before you deposit.
+Funds here are real bitcoin on mainnet, and your recovery phrase is the only thing that can rebuild the wallet from scratch. Write it down before you deposit anything.
 
 ## Documentation
 
@@ -16,7 +16,7 @@ This package runs Bark on Bitcoin **mainnet**, reading the blockchain from your 
 
 ## Getting set up
 
-1. Install **Bitcoin** first if you don't run it already. Bark requires it, with **pruning disabled** — Bitcoin only shares its RPC with other services on a full (archival) node, and Bark needs Bitcoin **29.0 or later** to be able to exit Ark on its own. If pruning is on, StartOS raises a task to turn it off.
+1. Install **Bitcoin** first if you don't run it already. Bark requires it, with **pruning disabled** — Bitcoin only shares its blockchain data with other services on a full (archival) node. If pruning is on, StartOS raises a task to turn it off. Bark also needs a recent enough Bitcoin to be able to exit Ark on its own, and StartOS won't let it start against an older one.
 2. On first install StartOS prompts you with the **Set UI Password** task. Run it to generate your login password, then note it — you can re-run the task any time to rotate it (which also signs out any existing sessions).
 3. StartOS shows two backup tasks:
    - a **critical** "Backup Safety" task explains how your wallet is backed up and asks you to acknowledge that you can lose funds without a current external backup and a safeguarded recovery phrase. This is required of everyone and clears only once you acknowledge it; and
@@ -55,5 +55,5 @@ A **local backup always runs** on this server automatically — no setup needed,
 
 ## Limitations
 
-- Mainnet only. The Ark server, chain source, and network are fixed; signet and regtest are not selectable from the StartOS UI.
+- Mainnet only. The Ark server and network are fixed; signet and regtest are not selectable from the StartOS UI.
 - Your Bitcoin node must be archival — Bark cannot use a pruned node, because Bitcoin keeps RPC to itself when pruning is on.

@@ -133,15 +133,17 @@ The same rewrite heals a changed bridge address and a restore onto a different s
 
 ## Dependencies
 
-| Dependency | Required | Health Checks               | Version Range | Purpose                |
-| ---------- | -------- | --------------------------- | ------------- | ---------------------- |
-| Bitcoin    | Yes      | `bitcoind`, `sync-progress` | see below     | Chain source, over RPC |
+One, required, and the service will not start without it. Both Core and Knots satisfy it; `setupDependencies()` holds the accepted range.
+
+| Dependency | Required | Health checks               | Mounts                                                       | Purpose                |
+| ---------- | -------- | --------------------------- | ------------------------------------------------------------ | ---------------------- |
+| Bitcoin    | Yes      | `bitcoind`, `sync-progress` | its `main` volume at `/mnt/bitcoind`, read-only, `barkd-sub` | Chain source, over RPC |
 
 Two constraints shape that row.
 
 **Archival only.** `bitcoin.conf` binds RPC to `127.0.0.1:58332` with `rpcallowip=127.0.0.1/32` when pruning is on, so a pruned node exposes nothing over the LXC bridge and the wallet would have no chain source at all. `dependencies.ts` therefore raises a **critical** `autoconfig` task on Bitcoin requiring `prune: 0`. `txindex` is _not_ required — `barkd` syncs via `bdk_bitcoind_rpc`, which walks blocks rather than looking transactions up by id.
 
-**Bitcoin 29.0 or later, floored per line.** Below 29.0 `barkd` can join Ark rounds but cannot unilaterally exit, which would leave funds recoverable only with the Ark server's cooperation. The range is `(>=29.4:4 && <30) || (>=30.3:4 && <31) || >=31.1:4` rather than a flat `>=29.4:4`: exver sorts 30.x and 31.x above 29.4:4, so a flat floor would also admit stale builds on those lines — including ones predating `prune=0`, where the autoconfig task opens a form seeded with 0 against a hardcoded minimum of 550 and `input-not-matches` re-raises it forever. Knots resolves through its `.satisfies()` claim on the 29.x line.
+**A version floor, applied per release line.** Below it `barkd` can join Ark rounds but cannot unilaterally exit, which would leave funds recoverable only with the Ark server's cooperation. Each line is floored at its own revision rather than one range covering all of them: exver sorts a higher major above a lower major's revision, so a single floor would also admit stale builds on the newer lines — including ones predating `prune=0`, where the autoconfig task above opens a form seeded with 0 against a hardcoded minimum of 550 and `input-not-matches` re-raises it forever. Knots resolves through its `.satisfies()` claim.
 
 Pruned-node users have to re-download the chain. That is the real cost of requiring an archival node, and it is called out in the release notes and instructions.
 
@@ -275,6 +277,8 @@ With no target ever configured, or none reachable, the wallet starts from the se
 
 ## Limitations and Differences
 
+What does not work, works differently, or is unavailable compared to running Bark yourself.
+
 1. **Mainnet only.** The Ark server and network are compiled in; signet and regtest are not selectable.
 2. **An archival Bitcoin node is required.** A pruned node keeps RPC to itself and cannot serve as a chain source, so a user who was pruning has to re-download the chain — see [Dependencies](#dependencies).
 3. **The wallet database is not in the StartOS backup**, by design. A restore without a reachable target recovers only what the seed can rebuild.
@@ -324,11 +328,10 @@ startos_managed_env_vars: # all passed to the api daemon
 dependencies:
   bitcoind:
     required: true
-    version_range: (>=29.4:4 && <30) || (>=30.3:4 && <31) || >=31.1:4
     health_checks: [bitcoind, sync-progress]
     # chain source over RPC; MUST be archival (prune=0) — a pruned node binds RPC to loopback
     # txindex NOT needed (barkd walks blocks via bdk_bitcoind_rpc)
-    # >=29.0 required for unilateral exit
+    # a version floor is enforced for unilateral exit; setupDependencies() holds the range
     # raises a critical `autoconfig` task on bitcoind setting prune: 0
 interfaces:
   ui: { type: ui, port: 8080 } # 4000 and 4001 are loopback-only
