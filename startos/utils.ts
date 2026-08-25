@@ -17,6 +17,25 @@ export const uiSessionSecretPath = `/data/ui_session_secret`
 // matching absolute paths — keep the two in sync.
 export const walletDb = `${walletDir}/db.sqlite`
 export const mnemonicPath = `${walletDir}/mnemonic`
+
+// barkd's own trace log. Its file logger is pinned to `Trace` in
+// bark-cli/src/log.rs and neither --quiet nor BARK_LOG reaches it — those shape
+// only the terminal logger — so nothing upstream bounds this file.
+export const debugLogPath = `${walletDir}/debug.log`
+export const debugLogMaxBytes = 64 * 1024 * 1024
+
+// barkd holds debug.log open with O_APPEND, so truncating in place is safe:
+// the next write lands at offset 0 rather than leaving a sparse hole, and barkd
+// never has to be restarted to reclaim the space.
+export const capDebugLogScript = `
+set -eu
+while :; do
+  if [ -f ${debugLogPath} ] && [ "$(stat -c %s ${debugLogPath})" -gt ${debugLogMaxBytes} ]; then
+    : > ${debugLogPath}
+  fi
+  sleep 15
+done
+`
 export const backupConfigSubpath = 'backup-config.json' // /data/backup-config.json
 export const startupFlagsSubpath = 'startupFlags.json' // /data/startupFlags.json
 export const backupStateSubpath = '.bark/.backup-state.json' // /data/.bark/.backup-state.json

@@ -35,7 +35,7 @@
 
 ## Image and Container Runtime
 
-One image, built here, running four daemons that StartOS supervises independently.
+One image, built here, running five daemons that StartOS supervises independently.
 
 | Property      | Value                                |
 | ------------- | ------------------------------------ |
@@ -67,6 +67,7 @@ One volume, and where a file sits on it decides whether it is backed up.
 | `.bark/db.sqlite`          | `barkd`    | The wallet database — **excluded** from the native backup |
 | `.bark/mnemonic`           | `barkd`    | The seed                                                  |
 | `.bark/auth_token`         | `barkd`    | The bearer token; never reaches the browser               |
+| `.bark/debug.log`          | `barkd`    | Trace log — capped, and excluded from the native backup   |
 | `.bark/.backup-state.json` | The agent  | Backup status — excluded from the native backup           |
 | `ui_password`              | An action  | The web login password                                    |
 | `ui_session_secret`        | The API    | Session signing key — excluded from the native backup     |
@@ -112,7 +113,7 @@ One interface, and the two internal ports behind it are never exposed.
 | --------- | ---- | ---- | ---- | ----------------------- |
 | Web UI    | `ui` | ui   | 8080 | The Bark Wallet web app |
 
-Bound on the `ui-multi` MultiHost over HTTP and not masked. `barkd` and the API bind loopback only; the four daemons share the service network namespace.
+Bound on the `ui-multi` MultiHost over HTTP and not masked. `barkd` and the API bind loopback only; the daemons share the service network namespace.
 
 **Authentication happens inside the container, not at the StartOS edge.** The API serves a native login page and gates every wallet route behind a signed HttpOnly session cookie issued after a constant-time password check. Consequences worth knowing:
 
@@ -192,15 +193,16 @@ The two backup tasks are raised on install alone. That is deliberate: they are o
 
 ## Health Checks
 
-Five checks, but only two are shown. The rest pass no display — they exist so a failing daemon restarts the service, not to be read.
+Six checks, but only two are shown. The rest pass no display — they exist so a failing daemon restarts the service, not to be read.
 
-| Check           | Displayed as    | Method                               |
-| --------------- | --------------- | ------------------------------------ |
-| `nginx`         | "Web Interface" | Port 8080 is listening               |
-| `backup-status` | "Wallet Backup" | The backup configuration and state   |
-| `barkd`         | — internal      | Port 4000 is listening               |
-| `api`           | — internal      | Port 4001 is listening               |
-| `backup-agent`  | — internal      | Always succeeds while the agent runs |
+| Check           | Displayed as    | Method                                |
+| --------------- | --------------- | ------------------------------------- |
+| `nginx`         | "Web Interface" | Port 8080 is listening                |
+| `backup-status` | "Wallet Backup" | The backup configuration and state    |
+| `barkd`         | — internal      | Port 4000 is listening                |
+| `api`           | — internal      | Port 4001 is listening                |
+| `backup-agent`  | — internal      | Always succeeds while the agent runs  |
+| `log-cap`       | — internal      | Always succeeds while the capper runs |
 
 **"Wallet Backup" reports failure when no external target is configured**, and that is a deliberate judgement rather than a fault. A local backup always runs, but recovering it depends on a manual StartOS backup, so it is likely stale exactly when it is needed — which for an Ark wallet risks funds received or moved since. The check says so in its message and points at the action.
 
@@ -219,7 +221,7 @@ So the two halves are split:
 - **The backup agent ships the database continuously**, encrypted with a key derived from the seed, to every enabled target — plus, always, to an on-box local copy. It snapshots on change with a periodic backstop.
 - **The native StartOS backup keeps the small, static remainder**: the seed, the bearer token, the login password, the backup configuration, the freshness watermark, and the local snapshots.
 
-Excluded from the native backup: the database and its journals, the backup status file, and the session secret — the last so that a restore regenerates it and forces a clean re-login.
+Excluded from the native backup: the database and its journals, the backup status file, `barkd`'s trace log, and the session secret — the last so that a restore regenerates it and forces a clean re-login.
 
 **Restore pulls the newest copy, and refuses a stale one.** The post-restore hook sets a flag; on the next start, a oneshot fetches and decrypts the freshest snapshot from the configured targets and writes the database _before_ `barkd` opens it. If the newest copy it finds is older than the watermark it restored, it **refuses to load it** rather than reverting the wallet — which is what makes a rolled-back backup target survivable. Two independent targets mean a rolled-back one is outvoted.
 
@@ -289,4 +291,5 @@ health_checks:
   - barkd # internal
   - api # internal
   - backup-agent # internal
+  - log-cap # internal
 ```

@@ -9,6 +9,7 @@ import {
   backupAgentScript,
   barkdPort,
   barkNetwork,
+  capDebugLogScript,
   chainSource,
   uiPasswordPath,
   uiSessionSecretPath,
@@ -140,6 +141,18 @@ export const main = sdk.setupMain(async ({ effects }) => {
           }),
       },
       requires: ['api'],
+    })
+    .addDaemon('log-cap', {
+      // barkd writes every log record to .bark/debug.log at trace level and
+      // offers no way to turn it down, so the file grows without bound and
+      // rides along in the native backup unless something bounds it here.
+      subcontainer: barkdSub,
+      exec: { command: ['sh', '-c', capDebugLogScript] },
+      ready: {
+        display: null,
+        fn: async () => ({ result: 'success', message: 'Active' }),
+      },
+      requires: ['barkd'],
     })
     .addDaemon('backup-agent', {
       // Watches db.sqlite, snapshots on change (+ a periodic backstop),
