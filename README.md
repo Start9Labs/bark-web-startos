@@ -124,6 +124,10 @@ The Ark server stays hosted. Ark is a two-party protocol, so the server is inher
 
 `CHAIN_SOURCE` is deliberately left **unset**: with both present the API warns and discards it. The URL is resolved reactively rather than compiled in, so `main` re-runs and repins the chain source whenever Bitcoin's bridge address changes.
 
+**The wallet is created by the package, not the browser**, and that is what makes a bitcoind chain source work at all. `barkd` reads a caller-supplied mnemonic as a recovery and refuses one on bitcoind without an explicit birthday height; it defaults that height to the chain tip only when it generates the seed itself. The web app always generates the seed in the browser, and it cannot supply a height either — `GET /api/v1/bitcoin/tip` requires an open wallet. So the `create-wallet` oneshot posts to `barkd`'s own create endpoint with **no mnemonic**, between `barkd` starting and the API coming up. It reads `GET /api/v1/wallet` first and exits without acting when a wallet is already there.
+
+The user still records the same twelve words, from the wallet's Settings screen — which is why `--expose-mnemonic` is passed to `barkd`.
+
 **The chain source is only settable at wallet creation.** `barkd` persists it in `config.toml` and exposes no endpoint to change it afterwards, so a wallet created against the old hosted explorer can be moved only by rewriting that file — which `main` does before `barkd` opens the wallet. Two behaviors shape the rewrite:
 
 - With both `esplora_address` and `bitcoind_address` set, `barkd` uses **esplora** — it dials `GET /block-height/0` and ignores the bitcoind keys. So the rewrite **deletes** `esplora_address` rather than adding alongside it.
@@ -172,7 +176,7 @@ Bitcoin comes first. It is a required dependency, so the service will not start 
 
 A oneshot creates the wallet directory before `barkd` starts, on every launch. On a restore, a second oneshot runs first and pulls the newest external snapshot into place **before** `barkd` opens the database — see [Backups and Restore](#backups-and-restore).
 
-The wallet itself is created by the web app: on first load it sees no wallet, generates a twelve-word phrase in the browser, and posts it. Upstream's create and import pages exist but nothing links to them, so this is the only path a user reaches.
+The wallet itself is created by the `create-wallet` oneshot, after `barkd` is listening and before the API starts — see [Chain Source](#chain-source) for why it cannot be left to the web app. By the time a user reaches the interface the wallet exists, so the app routes straight to the dashboard and its own onboarding never runs.
 
 Install raises three tasks, and the two backup ones are raised **once**, on install only — they are not re-created if the user later removes their targets. The ongoing indicator for that is the health check.
 
@@ -283,10 +287,11 @@ What does not work, works differently, or is unavailable compared to running Bar
 2. **An archival Bitcoin node is required.** A pruned node keeps RPC to itself and cannot serve as a chain source, so a user who was pruning has to re-download the chain — see [Dependencies](#dependencies).
 3. **The wallet database is not in the StartOS backup**, by design. A restore without a reachable target recovers only what the seed can rebuild.
 4. **A local-only backup is reported as a failing health check.** It is a floor, not protection — it does not survive losing the server.
-5. **The wallet is created automatically** on first load. There is no import path exposed, so an existing seed cannot be restored through the UI.
-6. **Rotating the login password signs out every session**, unavoidably.
-7. **There is no configuration form.** Changing the Ark server or network means editing the package source and rebuilding.
-8. **A rolled-back backup target is refused, not merged.** The service will ask for a current copy rather than load an older one.
+5. **The wallet is created automatically** before the interface is reachable. There is no import path exposed, so an existing seed cannot be restored through the UI, and the twelve words are read from Settings rather than shown during setup.
+6. **Two Settings controls stay disabled** — renaming the wallet and the manual database export. Both are gated on a browser-local record the app writes only when it creates the wallet itself, which never happens here. Neither affects funds or recovery.
+7. **Rotating the login password signs out every session**, unavoidably.
+8. **There is no configuration form.** Changing the Ark server or network means editing the package source and rebuilding.
+9. **A rolled-back backup target is refused, not merged.** The service will ask for a current copy rather than load an older one.
 
 ---
 

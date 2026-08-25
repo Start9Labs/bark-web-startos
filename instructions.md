@@ -22,7 +22,7 @@ Funds here are real bitcoin on mainnet, and your recovery phrase is the only thi
    - a **critical** "Backup Safety" task explains how your wallet is backed up and asks you to acknowledge that you can lose funds without a current external backup and a safeguarded recovery phrase. This is required of everyone and clears only once you acknowledge it; and
    - an **important** task recommends adding an external target via **Configure Backups** (see [Backups](#backups) below), and clears once you do.
 4. Open the **Web UI** interface from the service's **Dashboard** tab and log in with those credentials.
-5. Your wallet is created for you the first time the interface loads — there is nothing to choose, and a fresh twelve-word recovery phrase is generated on the spot.
+5. Your wallet is created for you when the service starts, before you ever open it — there is nothing to choose, and a fresh twelve-word recovery phrase is generated on your server.
 6. Go to **Settings** in the wallet, reveal your recovery phrase, and write it down and store it safely — it is the master key to your funds, and it is what decrypts your backups. Your seed can now rebuild your Ark balance on its own, but only with the Ark server's help; your continuous backup is the copy that does not depend on anyone else.
 7. Fund the wallet by receiving an on-chain deposit or an Ark payment.
 

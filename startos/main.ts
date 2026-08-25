@@ -10,10 +10,12 @@ import {
   arkServer,
   backupAgentScript,
   barkdPort,
+  barkdUrl,
   barkNetwork,
   bitcoindRpcUrl,
   btcCookiePath,
   btcMountpoint,
+  createWalletScript,
   uiPasswordPath,
   uiSessionSecretPath,
   uiPort,
@@ -136,6 +138,27 @@ export const main = sdk.setupMain(async ({ effects }) => {
       },
       requires: ['restore-pull'],
     })
+    .addOneshot('create-wallet', {
+      subcontainer: barkdSub,
+      exec: {
+        command: ['sh', '-c', createWalletScript],
+        env: {
+          CREATE_BODY: rpcUrl
+            ? JSON.stringify({
+                network: barkNetwork,
+                ark_server: arkServer,
+                chain_source: {
+                  bitcoind: {
+                    bitcoind: rpcUrl,
+                    bitcoind_auth: { cookie: { cookie: btcCookiePath } },
+                  },
+                },
+              })
+            : '',
+        },
+      },
+      requires: ['barkd'],
+    })
     .addDaemon('api', {
       subcontainer: sdk.SubContainer.of(
         effects,
@@ -150,7 +173,7 @@ export const main = sdk.setupMain(async ({ effects }) => {
           HOST: '127.0.0.1',
           WALLET_DIR: walletDir,
           WALLET_DATA_PATH: walletDataPath,
-          BARKD_URL: `http://127.0.0.1:${barkdPort}`,
+          BARKD_URL: barkdUrl,
           ARK_SERVER: arkServer,
           // bark-web builds a bitcoind ChainSourceConfig from these two and
           // ignores CHAIN_SOURCE entirely, so CHAIN_SOURCE is left unset rather
@@ -172,7 +195,7 @@ export const main = sdk.setupMain(async ({ effects }) => {
             errorMessage: 'The API is starting',
           }),
       },
-      requires: ['barkd'],
+      requires: ['create-wallet'],
     })
     .addDaemon('nginx', {
       subcontainer: sdk.SubContainer.of(

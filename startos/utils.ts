@@ -5,6 +5,7 @@ import { sdk } from './sdk'
 export const uiPort = 8080
 export const apiPort = 4001
 export const barkdPort = 4000
+export const barkdUrl = `http://127.0.0.1:${barkdPort}`
 
 export const walletDir = '/data/.bark'
 // Display-only path shown in the wallet's backup-reminder UI; must match walletDir.
@@ -21,6 +22,9 @@ export const uiSessionSecretPath = `/data/ui_session_secret`
 // matching absolute paths — keep the two in sync.
 export const walletDb = `${walletDir}/db.sqlite`
 export const mnemonicPath = `${walletDir}/mnemonic`
+// barkd writes this at startup, before it looks for a wallet, so it is readable
+// by the time the daemon accepts requests.
+export const authTokenPath = `${walletDir}/auth_token`
 export const backupConfigSubpath = 'backup-config.json' // /data/backup-config.json
 export const startupFlagsSubpath = 'startupFlags.json' // /data/startupFlags.json
 export const backupStateSubpath = '.bark/.backup-state.json' // /data/.bark/.backup-state.json
@@ -68,3 +72,25 @@ export const bitcoindRpcUrl = async (effects: T.Effects) => {
     .const()
   return bridge && `http://${bridge}`
 }
+// Creates the wallet through barkd's own REST API, letting barkd generate the
+// seed. barkd defaults the birthday height to the chain tip only on that path:
+// a caller-supplied mnemonic is treated as a recovery, which it refuses on a
+// bitcoind chain source without an explicit height, and the web app cannot read
+// the tip because that endpoint requires an open wallet. Creating it here also
+// means the app finds a wallet on first load and goes straight to the dashboard.
+//
+// `CREATE_BODY` is empty while bitcoind is unresolved — no chain source to pin,
+// so leave the wallet uncreated rather than pinning a broken one.
+export const createWalletScript = `
+set -eu
+[ -n "$CREATE_BODY" ] || exit 0
+auth="Authorization: Bearer $(cat ${authTokenPath})"
+if [ -n "$(curl -fsS -H "$auth" ${barkdUrl}/api/v1/wallet | jq -r '.fingerprint // empty')" ]; then
+  exit 0
+fi
+code=$(curl -sS -o /tmp/create-wallet.out -w '%{http_code}' -X POST -H "$auth" -H 'Content-Type: application/json' --data-binary "$CREATE_BODY" ${barkdUrl}/api/v1/wallet/create)
+[ "$code" = 200 ] || {
+  echo "wallet creation failed ($code): $(cat /tmp/create-wallet.out)" >&2
+  exit 1
+}
+`
