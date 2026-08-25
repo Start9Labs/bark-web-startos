@@ -1,6 +1,11 @@
+import { T } from '@start9labs/start-sdk'
+import { rpcHostId, rpcPort } from 'bitcoin-core-startos/startos/utils'
+import { sdk } from './sdk'
+
 export const uiPort = 8080
 export const apiPort = 4001
 export const barkdPort = 4000
+export const barkdUrl = `http://127.0.0.1:${barkdPort}`
 
 export const walletDir = '/data/.bark'
 // Display-only path shown in the wallet's backup-reminder UI; must match walletDir.
@@ -17,6 +22,9 @@ export const uiSessionSecretPath = `/data/ui_session_secret`
 // matching absolute paths — keep the two in sync.
 export const walletDb = `${walletDir}/db.sqlite`
 export const mnemonicPath = `${walletDir}/mnemonic`
+// barkd writes this at startup, before it looks for a wallet, so it is readable
+// by the time the daemon accepts requests.
+export const authTokenPath = `${walletDir}/auth_token`
 export const backupConfigSubpath = 'backup-config.json' // /data/backup-config.json
 export const startupFlagsSubpath = 'startupFlags.json' // /data/startupFlags.json
 export const backupStateSubpath = '.bark/.backup-state.json' // /data/.bark/.backup-state.json
@@ -31,5 +39,58 @@ export const backupFolderDefault = 'bark-backups'
 export const localBackupPath = '/data/local-backups'
 
 export const arkServer = 'https://ark.second.tech'
-export const chainSource = 'https://mempool.second.tech/api'
 export const barkNetwork = 'mainnet'
+
+// barkd's wallet config, written by barkd at wallet creation and re-read on
+// every start. main.ts rewrites its chain-source keys before barkd opens the
+// wallet — bark-web only sets the chain source at creation.
+export const configTomlSubpath = '.bark/config.toml'
+
+// bitcoind's data volume, mounted read-only into the barkd subcontainer so
+// barkd can read the RPC cookie itself.
+export const btcMountpoint = '/mnt/bitcoind'
+export const btcCookiePath = `${btcMountpoint}/.cookie`
+
+/**
+ * bitcoind's RPC bridge address as a URL (`http://<osIp>:8332`) — the chain
+ * source barkd syncs from. `null` while bitcoind is absent; callers then leave
+ * the chain source unwritten rather than pinning a fake address, and the
+ * `.const()` heals when bitcoind reappears.
+ *
+ * Only an archival node is reachable here: bitcoin.conf binds RPC to
+ * `127.0.0.1:58332` with `rpcallowip=127.0.0.1/32` when pruned, so the bridge
+ * resolves to nothing. Hence the `prune: 0` task in dependencies.ts.
+ */
+export const bitcoindRpcUrl = async (effects: T.Effects) => {
+  const bridge = await sdk.host
+    .getBridgeAddress(effects, {
+      packageId: 'bitcoind',
+      hostId: rpcHostId,
+      internalPort: rpcPort,
+      ssl: false,
+    })
+    .const()
+  return bridge && `http://${bridge}`
+}
+// Creates the wallet through barkd's own REST API, letting barkd generate the
+// seed. barkd defaults the birthday height to the chain tip only on that path:
+// a caller-supplied mnemonic is treated as a recovery, which it refuses on a
+// bitcoind chain source without an explicit height, and the web app cannot read
+// the tip because that endpoint requires an open wallet. Creating it here also
+// means the app finds a wallet on first load and goes straight to the dashboard.
+//
+// `CREATE_BODY` is empty while bitcoind is unresolved — no chain source to pin,
+// so leave the wallet uncreated rather than pinning a broken one.
+export const createWalletScript = `
+set -eu
+[ -n "$CREATE_BODY" ] || exit 0
+auth="Authorization: Bearer $(cat ${authTokenPath})"
+if [ -n "$(curl -fsS -H "$auth" ${barkdUrl}/api/v1/wallet | jq -r '.fingerprint // empty')" ]; then
+  exit 0
+fi
+code=$(curl -sS -o /tmp/create-wallet.out -w '%{http_code}' -X POST -H "$auth" -H 'Content-Type: application/json' --data-binary "$CREATE_BODY" ${barkdUrl}/api/v1/wallet/create)
+[ "$code" = 200 ] || {
+  echo "wallet creation failed ($code): $(cat /tmp/create-wallet.out)" >&2
+  exit 1
+}
+`

@@ -9,7 +9,7 @@
 > documentation is accurate and fully applicable — see the Documentation
 > section of `instructions.md` for links.
 
-[Bark](https://gitlab.com/ark-bitcoin/labs/bark-web) is a self-custodial Ark wallet with a web interface, running on Bitcoin mainnet against Second's hosted Ark server. This package adds the two things a self-hosted Ark wallet cannot do without: a login gate in front of the wallet, and continuous encrypted backup of a database that a periodic snapshot cannot safely capture.
+[Bark](https://gitlab.com/ark-bitcoin/labs/bark-web) is a self-custodial Ark wallet with a web interface, running on Bitcoin mainnet against Second's hosted Ark server. This package adds the three things a self-hosted Ark wallet cannot do without: a login gate in front of the wallet, continuous encrypted backup of a database that a periodic snapshot cannot safely capture, and a chain source that is the user's own node rather than a third party's explorer.
 
 - **Upstream repo:** <https://gitlab.com/ark-bitcoin/labs/bark-web>
 - **Wrapper repo:** <https://github.com/Start9Labs/bark-web-startos>
@@ -21,6 +21,7 @@
 - [Image and Container Runtime](#image-and-container-runtime)
 - [Volume and Data Layout](#volume-and-data-layout)
 - [File Models](#file-models)
+- [Chain Source](#chain-source)
 - [Dependencies](#dependencies)
 - [Network Access and Interfaces](#network-access-and-interfaces)
 - [Installation and First-Run Flow](#installation-and-first-run-flow)
@@ -67,6 +68,7 @@ One volume, and where a file sits on it decides whether it is backed up.
 | `.bark/db.sqlite`          | `barkd`    | The wallet database — **excluded** from the native backup |
 | `.bark/mnemonic`           | `barkd`    | The seed                                                  |
 | `.bark/auth_token`         | `barkd`    | The bearer token; never reaches the browser               |
+| `.bark/config.toml`        | `barkd`    | Wallet config, including the chain source                 |
 | `.bark/.backup-state.json` | The agent  | Backup status — excluded from the native backup           |
 | `ui_password`              | An action  | The web login password                                    |
 | `ui_session_secret`        | The API    | Session signing key — excluded from the native backup     |
@@ -77,9 +79,11 @@ One volume, and where a file sits on it decides whether it is backed up.
 
 **The UI-auth files sit at the volume root, not in `barkd`'s directory, and that is not tidiness.** `barkd` treats its data directory as wallet-owned and aborts wallet creation if it finds any file it does not recognise there. Keeping `ui_password` and `ui_session_secret` as siblings of `.bark/` leaves that directory clean.
 
+A second volume is borrowed rather than owned: Bitcoin's `main` volume is mounted **read-only** at `/mnt/bitcoind`, and only into `barkd-sub`. `barkd` reads the RPC cookie there itself; the API is given the path but never opens it.
+
 ## File Models
 
-Four models, and the interesting thing about them is that the largest file on the volume is deliberately _not_ one.
+Five models, and the interesting thing about them is that the largest file on the volume is deliberately _not_ one.
 
 | File                       | Format | Modelled                  | Written by                      |
 | -------------------------- | ------ | ------------------------- | ------------------------------- |
@@ -87,6 +91,7 @@ Four models, and the interesting thing about them is that the largest file on th
 | `backup-config.json`       | JSON   | Yes — `FileHelper.json`   | The Configure Backups action    |
 | `.bark/.backup-state.json` | JSON   | Yes — `FileHelper.json`   | The backup agent                |
 | `startupFlags.json`        | JSON   | Yes — `FileHelper.json`   | Restore, consumed at next start |
+| `.bark/config.toml`        | TOML   | Yes — `FileHelper.toml`   | `barkd`, rewritten by `main`    |
 
 **`ui_password`** is the canonical login password, read live by the API on every request rather than loaded once. `main` holds a reactive read of it, so rotating the password restarts the API — and because the session signature folds the password in, a rotation invalidates every existing session immediately.
 
@@ -98,11 +103,53 @@ Toggling a target off keeps its credentials, so re-enabling never means re-typin
 
 **`startupFlags.json`** carries one flag, set by the post-restore hook and consumed by the oneshot that pulls the wallet database back before `barkd` opens it.
 
-The wallet database has no model and is never touched by package code. Three values — the Ark server, the chain source, and the network — are compiled in and passed to the API as environment; there is no form for them.
+**`.bark/config.toml`** is the one model for a file this package does not own. `barkd` writes it at wallet creation and re-reads it on every start; `main` rewrites its chain-source keys and nothing else. The shape is a `looseObject` for that reason — the dozen-odd tuning fields `barkd` owns survive the read/write round-trip untouched.
+
+The wallet database has no model and is never touched by package code. The Ark server and the network are compiled in and passed to the API as environment; there is no form for them. The chain source is not compiled in — see below.
+
+## Chain Source
+
+**Chain data comes from the user's own `bitcoind` over RPC.** The on-chain wallet scan, tip height, transaction status, fee estimates and broadcasts all go through it, so nothing about the wallet is read from a third party and the wallet follows whichever consensus rules the user's node enforces — including through a chain split.
+
+That reaches further than a wallet balance. Bark has a real BDK on-chain wallet under the Ark layer, where boarding funds come from and where offboards and unilateral exits land, so the chain source also carries the P2A-anchor CPFP package that a unilateral exit broadcasts (`submitpackage`). It backs the self-custody guarantee, not just privacy.
+
+The Ark server stays hosted. Ark is a two-party protocol, so the server is inherent to it rather than a substitutable data source.
+
+**Nothing upstream is patched.** bark-web builds a bitcoind `ChainSourceConfig` itself from two environment variables, and the SPA forwards it verbatim to `barkd`:
+
+| Variable                   | Value                        | Read by                                          |
+| -------------------------- | ---------------------------- | ------------------------------------------------ |
+| `BITCOIND_RPC_URL`         | Bitcoin's RPC bridge address | The API, to build the config                     |
+| `BITCOIND_RPC_COOKIE_FILE` | `/mnt/bitcoind/.cookie`      | `barkd` — the API is given it but never stats it |
+
+`CHAIN_SOURCE` is deliberately left **unset**: with both present the API warns and discards it. The URL is resolved reactively rather than compiled in, so `main` re-runs and repins the chain source whenever Bitcoin's bridge address changes.
+
+**The wallet is created by the package, not the browser**, and that is what makes a bitcoind chain source work at all. `barkd` reads a caller-supplied mnemonic as a recovery and refuses one on bitcoind without an explicit birthday height; it defaults that height to the chain tip only when it generates the seed itself. The web app always generates the seed in the browser, and it cannot supply a height either — `GET /api/v1/bitcoin/tip` requires an open wallet. So the `create-wallet` oneshot posts to `barkd`'s own create endpoint with **no mnemonic**, between `barkd` starting and the API coming up. It reads `GET /api/v1/wallet` first and exits without acting when a wallet is already there.
+
+The user still records the same twelve words, from the wallet's Settings screen — which is why `--expose-mnemonic` is passed to `barkd`.
+
+**The chain source is only settable at wallet creation.** `barkd` persists it in `config.toml` and exposes no endpoint to change it afterwards, so a wallet created against the old hosted explorer can be moved only by rewriting that file — which `main` does before `barkd` opens the wallet. Two behaviors shape the rewrite:
+
+- With both `esplora_address` and `bitcoind_address` set, `barkd` uses **esplora** — it dials `GET /block-height/0` and ignores the bitcoind keys. So the rewrite **deletes** `esplora_address` rather than adding alongside it.
+- It fires only when `config.toml` already exists. Absent means no wallet yet, and it must stay absent: `barkd` rejects creation with `Cannot provide an existing config file and config flags`, and the create request always carries them.
+
+The same rewrite heals a changed bridge address and a restore onto a different server.
 
 ## Dependencies
 
-None. The wallet reaches Second's hosted Ark server and chain source over the internet rather than depending on a local Bitcoin node.
+One, required, and the service will not start without it. Both Core and Knots satisfy it; `setupDependencies()` holds the accepted range.
+
+| Dependency | Required | Health checks               | Mounts                                                       | Purpose                |
+| ---------- | -------- | --------------------------- | ------------------------------------------------------------ | ---------------------- |
+| Bitcoin    | Yes      | `bitcoind`, `sync-progress` | its `main` volume at `/mnt/bitcoind`, read-only, `barkd-sub` | Chain source, over RPC |
+
+Two constraints shape that row.
+
+**Archival only.** `bitcoin.conf` binds RPC to `127.0.0.1:58332` with `rpcallowip=127.0.0.1/32` when pruning is on, so a pruned node exposes nothing over the LXC bridge and the wallet would have no chain source at all. `dependencies.ts` therefore raises a **critical** `autoconfig` task on Bitcoin requiring `prune: 0`. `txindex` is _not_ required — `barkd` syncs via `bdk_bitcoind_rpc`, which walks blocks rather than looking transactions up by id.
+
+**A version floor, applied per release line.** Below it `barkd` can join Ark rounds but cannot unilaterally exit, which would leave funds recoverable only with the Ark server's cooperation. Each line is floored at its own revision rather than one range covering all of them: exver sorts a higher major above a lower major's revision, so a single floor would also admit stale builds on the newer lines — including ones predating `prune=0`, where the autoconfig task above opens a form seeded with 0 against a hardcoded minimum of 550 and `input-not-matches` re-raises it forever. Knots resolves through its `.satisfies()` claim.
+
+Pruned-node users have to re-download the chain. That is the real cost of requiring an archival node, and it is called out in the release notes and instructions.
 
 ## Network Access and Interfaces
 
@@ -125,9 +172,11 @@ Bound on the `ui-multi` MultiHost over HTTP and not masked. `barkd` and the API 
 
 ## Installation and First-Run Flow
 
+Bitcoin comes first. It is a required dependency, so the service will not start until Bitcoin is installed, running, and reporting both `bitcoind` and `sync-progress` healthy — and if it is pruned, until the critical **Auto-Configure** task raised on it has been run.
+
 A oneshot creates the wallet directory before `barkd` starts, on every launch. On a restore, a second oneshot runs first and pulls the newest external snapshot into place **before** `barkd` opens the database — see [Backups and Restore](#backups-and-restore).
 
-The wallet itself is created by the web app: on first load it sees no wallet, generates a twelve-word phrase in the browser, and posts it. Upstream's create and import pages exist but nothing links to them, so this is the only path a user reaches.
+The wallet itself is created by the `create-wallet` oneshot, after `barkd` is listening and before the API starts — see [Chain Source](#chain-source) for why it cannot be left to the web app. By the time a user reaches the interface the wallet exists, so the app routes straight to the dashboard and its own onboarding never runs.
 
 Install raises three tasks, and the two backup ones are raised **once**, on install only — they are not re-created if the user later removes their targets. The ongoing indicator for that is the health check.
 
@@ -176,7 +225,7 @@ Forces an immediate snapshot and upload. Run it to verify a newly configured tar
 
 ## Tasks
 
-Three, and they differ in whether they can come back.
+Three of its own, and they differ in whether they can come back. A fourth is raised on **Bitcoin** rather than here — the critical `prune: 0` autoconfig described under [Dependencies](#dependencies).
 
 | Task                | Severity    | Raised when                          | Cleared when                    |
 | ------------------- | ----------- | ------------------------------------ | ------------------------------- |
@@ -192,15 +241,18 @@ The two backup tasks are raised on install alone. That is deliberate: they are o
 
 ## Health Checks
 
-Five checks, but only two are shown. The rest pass no display — they exist so a failing daemon restarts the service, not to be read.
+Six checks, but only three are shown. The rest pass no display — they exist so a failing daemon restarts the service, not to be read.
 
-| Check           | Displayed as    | Method                               |
-| --------------- | --------------- | ------------------------------------ |
-| `nginx`         | "Web Interface" | Port 8080 is listening               |
-| `backup-status` | "Wallet Backup" | The backup configuration and state   |
-| `barkd`         | — internal      | Port 4000 is listening               |
-| `api`           | — internal      | Port 4001 is listening               |
-| `backup-agent`  | — internal      | Always succeeds while the agent runs |
+| Check           | Displayed as    | Method                                  |
+| --------------- | --------------- | --------------------------------------- |
+| `nginx`         | "Web Interface" | Port 8080 is listening                  |
+| `chain-source`  | "Chain Source"  | The resolved Bitcoin RPC bridge address |
+| `backup-status` | "Wallet Backup" | The backup configuration and state      |
+| `barkd`         | — internal      | Port 4000 is listening                  |
+| `api`           | — internal      | Port 4001 is listening                  |
+| `backup-agent`  | — internal      | Always succeeds while the agent runs    |
+
+**"Chain Source" names the node the wallet is reading from**, because whose node it is is the point of the arrangement. It succeeds with the RPC address in the message, and fails when the address is unresolved — Bitcoin uninstalled, or pruned, in which case RPC is loopback-only. Without it an unresolved address surfaces only as `barkd` sync failures in the logs.
 
 **"Wallet Backup" reports failure when no external target is configured**, and that is a deliberate judgement rather than a fault. A local backup always runs, but recovering it depends on a manual StartOS backup, so it is likely stale exactly when it is needed — which for an Ark wallet risks funds received or moved since. The check says so in its message and points at the action.
 
@@ -229,13 +281,17 @@ With no target ever configured, or none reachable, the wallet starts from the se
 
 ## Limitations and Differences
 
-1. **Mainnet only.** The Ark server, chain source, and network are compiled in; signet and regtest are not selectable.
-2. **The wallet database is not in the StartOS backup**, by design. A restore without a reachable target recovers only what the seed can rebuild.
-3. **A local-only backup is reported as a failing health check.** It is a floor, not protection — it does not survive losing the server.
-4. **The wallet is created automatically** on first load. There is no import path exposed, so an existing seed cannot be restored through the UI.
-5. **Rotating the login password signs out every session**, unavoidably.
-6. **There is no configuration form.** Changing the Ark server or network means editing the package source and rebuilding.
-7. **A rolled-back backup target is refused, not merged.** The service will ask for a current copy rather than load an older one.
+What does not work, works differently, or is unavailable compared to running Bark yourself.
+
+1. **Mainnet only.** The Ark server and network are compiled in; signet and regtest are not selectable.
+2. **An archival Bitcoin node is required.** A pruned node keeps RPC to itself and cannot serve as a chain source, so a user who was pruning has to re-download the chain — see [Dependencies](#dependencies).
+3. **The wallet database is not in the StartOS backup**, by design. A restore without a reachable target recovers only what the seed can rebuild.
+4. **A local-only backup is reported as a failing health check.** It is a floor, not protection — it does not survive losing the server.
+5. **The wallet is created automatically** before the interface is reachable. There is no import path exposed, so an existing seed cannot be restored through the UI, and the twelve words are read from Settings rather than shown during setup.
+6. **Two Settings controls stay disabled** — renaming the wallet and the manual database export. Both are gated on a browser-local record the app writes only when it creates the wallet itself, which never happens here. Neither affects funds or recovery.
+7. **Rotating the login password signs out every session**, unavoidably.
+8. **There is no configuration form.** Changing the Ark server or network means editing the package source and rebuilding.
+9. **A rolled-back backup target is refused, not merged.** The service will ask for a current copy rather than load an older one.
 
 ---
 
@@ -254,11 +310,13 @@ subcontainers:
   - backup-agent-sub # continuous backup
 volumes:
   main: /data
+  bitcoind/main: /mnt/bitcoind # read-only, barkd-sub only — the RPC cookie
 file_models:
   - ui_password
   - backup-config.json
   - .bark/.backup-state.json
   - startupFlags.json
+  - .bark/config.toml # barkd's own; only the chain-source keys are rewritten
 startos_managed_env_vars: # all passed to the api daemon
   - PORT
   - HOST
@@ -266,12 +324,20 @@ startos_managed_env_vars: # all passed to the api daemon
   - WALLET_DATA_PATH
   - BARKD_URL
   - ARK_SERVER
-  - CHAIN_SOURCE
+  - BITCOIND_RPC_URL # bitcoind's RPC bridge address; CHAIN_SOURCE deliberately unset
+  - BITCOIND_RPC_COOKIE_FILE # /mnt/bitcoind/.cookie — read by barkd, not the api
   - BARK_NETWORK
   - UI_AUTH
   - UI_PASSWORD_FILE
   - UI_SESSION_SECRET_FILE
-dependencies: []
+dependencies:
+  bitcoind:
+    required: true
+    health_checks: [bitcoind, sync-progress]
+    # chain source over RPC; MUST be archival (prune=0) — a pruned node binds RPC to loopback
+    # txindex NOT needed (barkd walks blocks via bdk_bitcoind_rpc)
+    # a version floor is enforced for unilateral exit; setupDependencies() holds the range
+    # raises a critical `autoconfig` task on bitcoind setting prune: 0
 interfaces:
   ui: { type: ui, port: 8080 } # 4000 and 4001 are loopback-only
 actions:
@@ -285,6 +351,7 @@ tasks:
   - { action: configure-backup, severity: important } # install only
 health_checks:
   - nginx # displayed "Web Interface"
+  - chain-source # displayed "Chain Source"
   - backup-status # displayed "Wallet Backup"
   - barkd # internal
   - api # internal

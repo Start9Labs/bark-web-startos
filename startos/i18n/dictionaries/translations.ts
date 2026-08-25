@@ -11,6 +11,7 @@ export default {
     6: 'Establecer contraseña de la interfaz',
     7: 'Genera una nueva contraseña para iniciar sesión en la interfaz web de Bark Wallet. Rotarla también cierra las sesiones activas.',
     8: 'Genera una contraseña para iniciar sesión en la interfaz web de Bark Wallet',
+    9: 'Bark se sincroniza con Bitcoin mediante RPC, lo que requiere un nodo de archivo',
   },
   de_DE: {
     0: 'Starte Bark Wallet!',
@@ -22,6 +23,7 @@ export default {
     6: 'UI-Passwort festlegen',
     7: 'Generiert ein neues Passwort für die Anmeldung an der Weboberfläche von Bark Wallet. Beim Ändern werden aktive Sitzungen abgemeldet.',
     8: 'Generiere ein Passwort für die Anmeldung an der Weboberfläche von Bark Wallet',
+    9: 'Bark synchronisiert per RPC mit Bitcoin, was einen Archivknoten erfordert',
   },
   pl_PL: {
     0: 'Uruchamianie Bark Wallet!',
@@ -33,6 +35,7 @@ export default {
     6: 'Ustaw hasło interfejsu',
     7: 'Generuje nowe hasło do logowania w interfejsie webowym Bark Wallet. Jego zmiana wylogowuje aktywne sesje.',
     8: 'Wygeneruj hasło do logowania w interfejsie webowym Bark Wallet',
+    9: 'Bark synchronizuje się z Bitcoin przez RPC, co wymaga węzła archiwalnego',
   },
   fr_FR: {
     0: 'Démarrage de Bark Wallet !',
@@ -44,5 +47,6 @@ export default {
     6: "Définir le mot de passe de l'interface",
     7: "Génère un nouveau mot de passe pour se connecter à l'interface web de Bark Wallet. Sa rotation déconnecte les sessions actives.",
     8: "Génère un mot de passe pour se connecter à l'interface web de Bark Wallet",
+    9: "Bark se synchronise avec Bitcoin via RPC, ce qui nécessite un nœud d'archive",
   },
 } satisfies Record<string, LangDict>

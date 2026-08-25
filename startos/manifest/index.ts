@@ -1,5 +1,5 @@
 import { setupManifest } from '@start9labs/start-sdk'
-import { long, short } from './i18n'
+import { bitcoindDescription, long, short } from './i18n'
 
 export const manifest = setupManifest({
   id: 'bark-web',
@@ -17,5 +17,14 @@ export const manifest = setupManifest({
       arch: ['x86_64', 'aarch64'],
     },
   },
-  dependencies: {},
+  dependencies: {
+    bitcoind: {
+      description: bitcoindDescription,
+      optional: false,
+      metadata: {
+        title: 'Bitcoin',
+        icon: 'https://raw.githubusercontent.com/Start9Labs/bitcoin-core-startos/refs/heads/30.x/dep-icon.svg',
+      },
+    },
+  },
 })
