@@ -52,7 +52,7 @@ One image, built here, running five daemons that StartOS supervises independentl
 
 The `barkd` binary is fetched from the upstream release with a pinned checksum; the web app and API are built from the upstream tag.
 
-**`--expose-mnemonic` is passed to `barkd` and is load-bearing.** Upstream made the mnemonic endpoint opt-in and 404 by default, and the wallet's Settings screen is the only place a user can ever read their recovery phrase — the upstream create and import pages are unreachable here. Without the flag a user could never record the seed that both recovers their funds and decrypts their backups. It is safe because the endpoint is reachable only through the API's session-guarded route, on a daemon bound to loopback behind a bearer token.
+**`--expose-mnemonic` is passed to `barkd` and is load-bearing.** Upstream made the mnemonic endpoint opt-in and 404 by default, and the wallet's Settings screen is the only place a user can read their recovery phrase after onboarding: a wallet created before this release was generated for them and never displayed one, the create flow lets them skip the confirmation step, and an imported wallet never shows it at all. Without the flag such a user could never record the seed that both recovers their funds and decrypts their backups. It is safe because the endpoint is reachable only through the API's session-guarded route, on a daemon bound to loopback behind a bearer token.
 
 ## Volume and Data Layout
 
@@ -67,7 +67,7 @@ One volume, and where a file sits on it decides whether it is backed up.
 | `.bark/db.sqlite`          | `barkd`    | The wallet database — **excluded** from the native backup |
 | `.bark/mnemonic`           | `barkd`    | The seed                                                  |
 | `.bark/auth_token`         | `barkd`    | The bearer token; never reaches the browser               |
-| `.bark/debug.log`          | `barkd`    | Trace log — capped, and excluded from the native backup   |
+| `.bark/debug.log`          | `barkd`    | Debug log — capped, and excluded from the native backup   |
 | `.bark/.backup-state.json` | The agent  | Backup status — excluded from the native backup           |
 | `ui_password`              | An action  | The web login password                                    |
 | `ui_session_secret`        | The API    | Session signing key — excluded from the native backup     |
@@ -117,7 +117,7 @@ Bound on the `ui-multi` MultiHost over HTTP and not masked. `barkd` and the API 
 
 **Authentication happens inside the container, not at the StartOS edge.** The API serves a native login page and gates every wallet route behind a signed HttpOnly session cookie issued after a constant-time password check. Consequences worth knowing:
 
-- **It fails closed.** With no password file the API returns `503` rather than serving an open wallet, so a fresh install cannot be reached before its password task is done. The auth flag is also baked into the image, so a dropped runtime variable cannot open it either.
+- **It fails closed.** With no password file the API returns `503` on every wallet route rather than serving an open wallet, so a fresh install cannot be reached before its password task is done. The auth flag is also baked into the image, so a dropped runtime variable cannot open it either. Upstream's first-run password endpoint, which sets a password when none exists, is inert here: the password task is critical, so the service never starts without the file it needs, and the endpoint answers `409` once one exists.
 - **Changing the password signs everyone out**, immediately, because the signing key folds in the password and the API reads it live per request.
 - **The cookie's `Secure` flag is set from the forwarded protocol**, so the same build works over Tor's HTTP and LAN's HTTPS.
 - **CSRF needs both** a strict-same-site cookie and a custom header on state-changing methods, and login carries a global exponential-backoff lockout.
@@ -128,7 +128,7 @@ Bound on the `ui-multi` MultiHost over HTTP and not masked. `barkd` and the API 
 
 A oneshot creates the wallet directory before `barkd` starts, on every launch. On a restore, a second oneshot runs first and pulls the newest external snapshot into place **before** `barkd` opens the database — see [Backups and Restore](#backups-and-restore).
 
-The wallet itself is created by the web app: on first load it sees no wallet, generates a twelve-word phrase in the browser, and posts it. Upstream's create and import pages exist but nothing links to them, so this is the only path a user reaches.
+The wallet itself is created by the web app. On first load it offers a choice: create a wallet, which generates a twelve-word phrase in the browser, displays it, and asks the user to confirm it back before posting it to `barkd`; or import one, which takes an existing phrase and a birthday height that stays optional here, because an Esplora chain source ignores it. Either way the seed is generated or entered in the browser and `barkd` persists it. Once a wallet exists both routes redirect to the dashboard, so neither can be used to create a second wallet over the first — deleting the wallet from the app's Settings is what makes them reachable again.
 
 Install raises three tasks, and the two backup ones are raised **once**, on install only — they are not re-created if the user later removes their targets. The ongoing indicator for that is the health check.
 
@@ -221,7 +221,7 @@ So the two halves are split:
 - **The backup agent ships the database continuously**, encrypted with a key derived from the seed, to every enabled target — plus, always, to an on-box local copy. It snapshots on change with a periodic backstop.
 - **The native StartOS backup keeps the small, static remainder**: the seed, the bearer token, the login password, the backup configuration, the freshness watermark, and the local snapshots.
 
-Excluded from the native backup: the database and its journals, the backup status file, `barkd`'s trace log, and the session secret — the last so that a restore regenerates it and forces a clean re-login.
+Excluded from the native backup: the database and its journals, the backup status file, `barkd`'s debug log, and the session secret — the last so that a restore regenerates it and forces a clean re-login.
 
 **Restore pulls the newest copy, and refuses a stale one.** The post-restore hook sets a flag; on the next start, a oneshot fetches and decrypts the freshest snapshot from the configured targets and writes the database _before_ `barkd` opens it. If the newest copy it finds is older than the watermark it restored, it **refuses to load it** rather than reverting the wallet — which is what makes a rolled-back backup target survivable. Two independent targets mean a rolled-back one is outvoted.
 
@@ -234,7 +234,7 @@ With no target ever configured, or none reachable, the wallet starts from the se
 1. **Mainnet only.** The Ark server, chain source, and network are compiled in; signet and regtest are not selectable.
 2. **The wallet database is not in the StartOS backup**, by design. A restore without a reachable target recovers only what the seed can rebuild.
 3. **A local-only backup is reported as a failing health check.** It is a floor, not protection — it does not survive losing the server.
-4. **The wallet is created automatically** on first load. There is no import path exposed, so an existing seed cannot be restored through the UI.
+4. **The wallet is created or imported through the web app**, not through a StartOS action, so the recovery phrase is only ever handled in the browser and never passes through a StartOS action result.
 5. **Rotating the login password signs out every session**, unavoidably.
 6. **There is no configuration form.** Changing the Ark server or network means editing the package source and rebuilding.
 7. **A rolled-back backup target is refused, not merged.** The service will ask for a current copy rather than load an older one.

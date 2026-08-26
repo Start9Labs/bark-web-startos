@@ -72,12 +72,14 @@ export const main = sdk.setupMain(async ({ effects }) => {
           '--datadir',
           walletDir,
           // barkd 0.5.0 made GET /api/v1/wallet/mnemonic opt-in, 404 by
-          // default. Upstream's /create and /import pages are unreachable, so
-          // the wallet's Settings screen is the only way a user can ever read
-          // their recovery phrase — without this they could never record it.
-          // From bark-web 0.7.2 the endpoint is reachable only through the
-          // API's session-guarded POST /api/reveal-mnemonic, on a daemon bound
-          // to loopback behind a bearer token.
+          // default. The wallet's Settings screen is the only place a user can
+          // read the phrase after onboarding — a wallet created before
+          // bark-web 0.8.0 was generated for them and never displayed one, the
+          // create flow lets them skip the confirmation step, and an imported
+          // wallet never shows it at all. From bark-web 0.7.2 the endpoint is
+          // reachable only through the API's session-guarded POST
+          // /api/reveal-mnemonic, on a daemon bound to loopback behind a
+          // bearer token.
           '--expose-mnemonic',
         ],
       },
@@ -143,9 +145,9 @@ export const main = sdk.setupMain(async ({ effects }) => {
       requires: ['api'],
     })
     .addDaemon('log-cap', {
-      // barkd writes every log record to .bark/debug.log at trace level and
-      // offers no way to turn it down, so the file grows without bound and
-      // rides along in the native backup unless something bounds it here.
+      // barkd appends to .bark/debug.log and never rotates it, so the file
+      // grows without bound and rides along in the native backup unless
+      // something bounds it here.
       subcontainer: barkdSub,
       exec: { command: ['sh', '-c', capDebugLogScript] },
       ready: {
