@@ -18,9 +18,11 @@ export const uiSessionSecretPath = `/data/ui_session_secret`
 export const walletDb = `${walletDir}/db.sqlite`
 export const mnemonicPath = `${walletDir}/mnemonic`
 
-// barkd's own trace log. Its file logger is pinned to `Trace` in
-// bark-cli/src/log.rs and neither --quiet nor BARK_LOG reaches it — those shape
-// only the terminal logger — so nothing upstream bounds this file.
+// barkd's own debug log. From bark 0.6.2 the file logger shares the terminal
+// logger's level (Info by default, raised by BARK_LOG), and --no-logfile turns
+// it off entirely — but nothing upstream rotates or bounds the file, and the
+// wallet's Settings screen downloads it, so it is capped here rather than
+// disabled.
 export const debugLogPath = `${walletDir}/debug.log`
 export const debugLogMaxBytes = 64 * 1024 * 1024
 
