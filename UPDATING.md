@@ -14,10 +14,10 @@ curl -s 'https://gitlab.com/api/v4/projects/ark-bitcoin%2Fbark/repository/compar
 
 ## Determining the upstream versions
 
-- **bark-web** ([labs/bark-web](https://gitlab.com/ark-bitcoin/labs/bark-web)) — latest git tag:
+- **bark-web** ([ark-bitcoin/bark-web](https://gitlab.com/ark-bitcoin/bark-web)) — latest git tag:
 
   ```sh
-  git ls-remote --tags https://gitlab.com/ark-bitcoin/labs/bark-web.git | tail
+  git ls-remote --tags https://gitlab.com/ark-bitcoin/bark-web.git | tail
   ```
 
   Confirm the bundled daemon client version in that tag's `package-lock.json` under `node_modules/@secondts/barkd` — `BARK_VERSION` should match it.
