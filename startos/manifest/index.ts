@@ -6,7 +6,7 @@ export const manifest = setupManifest({
   title: 'Bark Wallet',
   license: 'MIT',
   packageRepo: 'https://github.com/Start9Labs/bark-web-startos',
-  upstreamRepo: 'https://gitlab.com/ark-bitcoin/labs/bark-web',
+  upstreamRepo: 'https://gitlab.com/ark-bitcoin/bark-web',
   marketingUrl: 'https://second.tech',
   donationUrl: null,
   description: { short, long },

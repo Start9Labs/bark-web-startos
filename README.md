@@ -9,9 +9,9 @@
 > documentation is accurate and fully applicable — see the Documentation
 > section of `instructions.md` for links.
 
-[Bark](https://gitlab.com/ark-bitcoin/labs/bark-web) is a self-custodial Ark wallet with a web interface, running on Bitcoin mainnet against Second's hosted Ark server. This package adds the two things a self-hosted Ark wallet cannot do without: a login gate in front of the wallet, and continuous encrypted backup of a database that a periodic snapshot cannot safely capture.
+[Bark](https://gitlab.com/ark-bitcoin/bark-web) is a self-custodial Ark wallet with a web interface, running on Bitcoin mainnet against Second's hosted Ark server. This package adds the two things a self-hosted Ark wallet cannot do without: a login gate in front of the wallet, and continuous encrypted backup of a database that a periodic snapshot cannot safely capture.
 
-- **Upstream repo:** <https://gitlab.com/ark-bitcoin/labs/bark-web>
+- **Upstream repo:** <https://gitlab.com/ark-bitcoin/bark-web>
 - **Wrapper repo:** <https://github.com/Start9Labs/bark-web-startos>
 
 ---

@@ -12,7 +12,7 @@ export const current = VersionInfo.of({
 • Fixes a fee mismatch that made some on-chain sends from Ark fail, and adds sanity checks on round results and on incoming payments from the Ark mailbox.
 • The balance chart gains a timeframe selector.
 
-Full details: https://gitlab.com/ark-bitcoin/labs/bark-web/-/blob/v0.8.0/CHANGELOG.md and https://gitlab.com/ark-bitcoin/bark/-/releases/bark-0.6.2`,
+Full details: https://gitlab.com/ark-bitcoin/bark-web/-/blob/v0.8.0/CHANGELOG.md and https://gitlab.com/ark-bitcoin/bark/-/releases/bark-0.6.2`,
     es_ES: `Actualiza Bark a bark-web 0.8.0 con el demonio de monedero barkd 0.6.2.
 
 • Ya no se crea un monedero en silencio. Al abrirlo por primera vez, el monedero pregunta si quieres crear uno —mostrando la frase de recuperación de doce palabras y pidiéndote que la confirmes— o importar una frase que ya tengas. Los monederos existentes van directamente al panel, como antes, y Ajustes sigue revelando la frase.
@@ -22,7 +22,7 @@ Full details: https://gitlab.com/ark-bitcoin/labs/bark-web/-/blob/v0.8.0/CHANGEL
 • Corrige un desajuste de comisiones que hacía fallar algunos envíos en cadena desde Ark y añade comprobaciones de coherencia sobre los resultados de las rondas y los pagos entrantes del buzón de Ark.
 • El gráfico de saldo incorpora un selector de periodo.
 
-Detalles completos: https://gitlab.com/ark-bitcoin/labs/bark-web/-/blob/v0.8.0/CHANGELOG.md y https://gitlab.com/ark-bitcoin/bark/-/releases/bark-0.6.2`,
+Detalles completos: https://gitlab.com/ark-bitcoin/bark-web/-/blob/v0.8.0/CHANGELOG.md y https://gitlab.com/ark-bitcoin/bark/-/releases/bark-0.6.2`,
     de_DE: `Aktualisiert Bark auf bark-web 0.8.0 mit dem Wallet-Daemon barkd 0.6.2.
 
 • Eine neue Wallet wird nicht mehr stillschweigend angelegt. Beim ersten Aufruf fragt die Wallet, ob eine neue erstellt werden soll — sie zeigt die zwölf Wörter der Wiederherstellungsphrase an und lässt sie bestätigen — oder ob eine vorhandene Phrase importiert wird. Bestehende Wallets gelangen wie bisher direkt zur Übersicht, und die Einstellungen zeigen die Phrase weiterhin an.
@@ -32,7 +32,7 @@ Detalles completos: https://gitlab.com/ark-bitcoin/labs/bark-web/-/blob/v0.8.0/C
 • Behebt eine Gebührenabweichung, an der manche On-Chain-Sendungen aus Ark scheiterten, und ergänzt Plausibilitätsprüfungen für Rundenergebnisse und eingehende Zahlungen aus dem Ark-Postfach.
 • Das Guthabendiagramm erhält eine Zeitraumauswahl.
 
-Alle Details: https://gitlab.com/ark-bitcoin/labs/bark-web/-/blob/v0.8.0/CHANGELOG.md und https://gitlab.com/ark-bitcoin/bark/-/releases/bark-0.6.2`,
+Alle Details: https://gitlab.com/ark-bitcoin/bark-web/-/blob/v0.8.0/CHANGELOG.md und https://gitlab.com/ark-bitcoin/bark/-/releases/bark-0.6.2`,
     pl_PL: `Aktualizuje Bark do bark-web 0.8.0 z demonem portfela barkd 0.6.2.
 
 • Nowy portfel nie jest już tworzony po cichu. Przy pierwszym otwarciu portfel pyta, czy utworzyć nowy — pokazując dwunastowyrazową frazę odzyskiwania i prosząc o jej potwierdzenie — czy zaimportować frazę, którą już masz. Istniejące portfele trafiają od razu do pulpitu, tak jak dotąd, a Ustawienia nadal ujawniają frazę.
@@ -42,7 +42,7 @@ Alle Details: https://gitlab.com/ark-bitcoin/labs/bark-web/-/blob/v0.8.0/CHANGEL
 • Naprawia rozbieżność opłat, przez którą część wypłat on-chain z Ark kończyła się niepowodzeniem, oraz dodaje kontrole poprawności wyników rund i przychodzących płatności ze skrzynki Ark.
 • Wykres salda zyskuje wybór zakresu czasu.
 
-Pełne szczegóły: https://gitlab.com/ark-bitcoin/labs/bark-web/-/blob/v0.8.0/CHANGELOG.md oraz https://gitlab.com/ark-bitcoin/bark/-/releases/bark-0.6.2`,
+Pełne szczegóły: https://gitlab.com/ark-bitcoin/bark-web/-/blob/v0.8.0/CHANGELOG.md oraz https://gitlab.com/ark-bitcoin/bark/-/releases/bark-0.6.2`,
     fr_FR: `Met à jour Bark vers bark-web 0.8.0 avec le démon de portefeuille barkd 0.6.2.
 
 • Un nouveau portefeuille n'est plus créé silencieusement. Au premier chargement, le portefeuille demande s'il faut en créer un — en affichant la phrase de récupération de douze mots et en vous demandant de la confirmer — ou importer une phrase que vous détenez déjà. Les portefeuilles existants arrivent directement sur le tableau de bord, comme avant, et les Réglages révèlent toujours la phrase.
@@ -52,7 +52,7 @@ Pełne szczegóły: https://gitlab.com/ark-bitcoin/labs/bark-web/-/blob/v0.8.0/C
 • Corrige un écart de frais qui faisait échouer certains envois on-chain depuis Ark et ajoute des contrôles de cohérence sur les résultats des rondes et sur les paiements entrants de la boîte aux lettres Ark.
 • Le graphique de solde gagne un sélecteur de période.
 
-Détails complets : https://gitlab.com/ark-bitcoin/labs/bark-web/-/blob/v0.8.0/CHANGELOG.md et https://gitlab.com/ark-bitcoin/bark/-/releases/bark-0.6.2`,
+Détails complets : https://gitlab.com/ark-bitcoin/bark-web/-/blob/v0.8.0/CHANGELOG.md et https://gitlab.com/ark-bitcoin/bark/-/releases/bark-0.6.2`,
   },
   migrations: {},
 })

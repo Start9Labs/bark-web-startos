@@ -11,7 +11,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
     && rm -rf /var/lib/apt/lists/*
 ARG BARK_WEB_VERSION
 RUN git clone --depth 1 --branch v${BARK_WEB_VERSION} \
-      https://gitlab.com/ark-bitcoin/labs/bark-web.git /src
+      https://gitlab.com/ark-bitcoin/bark-web.git /src
 
 # ---- SPA build ----
 FROM docker.io/node:22-alpine AS spa-builder
