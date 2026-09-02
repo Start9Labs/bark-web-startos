@@ -2,7 +2,7 @@
 # StartOS. The bark-web frontend and its API proxy are built from the upstream
 # git tag; barkd is fetched as a release binary with a pinned checksum.
 
-ARG BARK_WEB_VERSION=0.8.0
+ARG BARK_WEB_VERSION=0.8.1
 ARG BARK_VERSION=0.6.2
 
 # ---- Upstream source checkout ----
