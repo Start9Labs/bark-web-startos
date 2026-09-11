@@ -43,6 +43,23 @@ export const startupFlagsSubpath = 'startupFlags.json' // /data/startupFlags.jso
 export const backupStateSubpath = '.bark/.backup-state.json' // /data/.bark/.backup-state.json
 export const backupAgentScript = '/usr/local/bin/backup-agent.sh'
 export const backupFolderDefault = 'bark-backups'
+
+// rclone's nextcloud vendor refuses any address that does not end in
+// /remote.php/dav/files/USER — the form neither Nextcloud's UI nor StartOS's
+// Nextcloud interface shows.
+export function nextcloudDavUrl(address: string, user: string): string {
+  let url: URL
+  try {
+    url = new URL(address)
+  } catch {
+    throw new Error('Nextcloud: that is not a valid address.')
+  }
+  if (!user || /\/dav\/files\/[^/]+/.test(url.pathname)) return address
+  const base = url.pathname
+    .replace(/\/+$/, '')
+    .replace(/\/(remote\.php\/(dav|webdav)|index\.php.*|apps\/.*)$/, '')
+  return `${url.origin}${base}/remote.php/dav/files/${encodeURIComponent(user)}/`
+}
 // Always-on local backup: an on-box rclone `local` remote (managed by
 // backup-agent.sh, not user-configurable). It lives on the main volume so it IS
 // included in the native StartOS backup (rides along with everything else), and

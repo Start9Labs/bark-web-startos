@@ -25,7 +25,7 @@ import { backupFolderDefault } from '../utils'
 // Each target carries its own `enabled` flag; the agent ships only to enabled
 // targets. `path` is the folder within the target. The gdrive/dropbox `token`
 // is the rclone OAuth token JSON (holds the refresh token), minted once by the
-// Configure Backups action. `riskAccepted` is the user's acknowledgement that
+// Configure Continuous Backups action. `riskAccepted` is the user's acknowledgement that
 // funds can be lost without a current external backup and a safeguarded seed.
 const oauthTarget = z.object({
   enabled: z.boolean().catch(false),

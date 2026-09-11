@@ -5,12 +5,12 @@ import { sdk } from '../sdk'
 // and a required acknowledgement that the user understands the situation and
 // accepts that funds can be lost without an external backup AND a safeguarded
 // seed. This is informed consent, required of every user — not contingent on
-// the current target config. Configure Backups stays practical.
+// the current target config. Configure Continuous Backups stays practical.
 const WARNING = `<b>How your Bark wallet is backed up — please read.</b><br><br>
 Every time your wallet changes (a payment, an Ark round, an on-chain movement), an encrypted copy is sent to your backup target — the key comes from your <b>Bark 12-word recovery phrase</b> (your wallet seed). A backup only protects you if it's <b>current</b> when you restore: an old copy <b>permanently loses any Ark or Lightning funds received or moved since</b> (on-chain funds stay recoverable from your seed).<br><br>
 <b>To stay safe, do all three:</b>
 <ul>
-<li><b>Add an external target</b> (Configure Backups). The on-box local backup alone survives only inside a manual StartOS backup, so it's usually stale when you need it.</li>
+<li><b>Add an external target</b> (Configure Continuous Backups). The on-box local backup alone survives only inside a manual StartOS backup, so it's usually stale when you need it.</li>
 <li><b>Take a StartOS backup afterward</b> (System → Create Backup) and keep its <b>StartOS master password</b>. That backup holds your seed and the pointer to your target; without it a restore can't find your target and comes back stale. Re-take it whenever you change targets.</li>
 <li><b>Record your Bark 12-word recovery phrase now</b> — open the wallet, go to <b>Settings</b>, and reveal it. Your wallet is created for you automatically the first time the interface loads, so the phrase is never shown to you unprompted; you have to go and get it.</li>
 </ul>
@@ -25,7 +25,7 @@ export const acknowledgeRisk = sdk.Action.withInput(
       'How your Bark wallet is backed up, and a required acknowledgement that you can lose funds without a current external backup, your 12-word recovery phrase, and your StartOS master password.',
     warning: WARNING,
     allowedStatuses: 'any',
-    group: 'Backups',
+    group: 'Continuous Backups',
     visibility: 'enabled',
   }),
 
