@@ -2,8 +2,8 @@
 # StartOS. The bark-web frontend and its API proxy are built from the upstream
 # git tag; barkd is fetched as a release binary with a pinned checksum.
 
-ARG BARK_WEB_VERSION=0.8.1
-ARG BARK_VERSION=0.6.2
+ARG BARK_WEB_VERSION=0.9.0
+ARG BARK_VERSION=0.7.1
 
 # ---- Upstream source checkout ----
 FROM docker.io/debian:bookworm-slim AS source
@@ -37,8 +37,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
     && rm -rf /var/lib/apt/lists/*
 ARG BARK_VERSION
 ARG TARGETARCH
-ARG BARKD_SHA256_AMD64=cc38da1b83743c70a2e979e0762da69fbc88d03c6def8bb42fa2c986c0f52fcb
-ARG BARKD_SHA256_ARM64=8fab02cea5dd97299ec73a3ced2ffc6c8cf2a17e17917a300cad948bbb4905b5
+ARG BARKD_SHA256_AMD64=8067b9aab31e250e5580620e3fd0be61f5b778860346d2433b11eae9992db85a
+ARG BARKD_SHA256_ARM64=b9604e1dc4ec409d49ac842aa39dd77e0177f7b3c409a63f255f5b36d2941dd7
 WORKDIR /out
 RUN case "${TARGETARCH}" in \
       amd64) ARCH="x86_64"; SHA="${BARKD_SHA256_AMD64}" ;; \
