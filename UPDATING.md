@@ -5,7 +5,7 @@ This package wraps two upstream artifacts from the [ark-bitcoin](https://gitlab.
 - **`bark-web`** — the frontend GUI and its API proxy, built from a git tag (`BARK_WEB_VERSION`).
 - **`barkd`** — the wallet daemon, fetched as a release binary with a pinned SHA-256 (`BARK_VERSION`).
 
-The two are versioned independently. Keep `BARK_VERSION` aligned with the daemon release that the `bark-web` tag pins in `.env.mainnet`, `docker/checksums.env`, and `start9-app/Dockerfile`. The bundled `@secondts/barkd` JS client can be a patch ahead of that binary — bark-web 0.9.0 deliberately pairs client 0.7.2 with daemon 0.7.1 — so the client version alone does not select the daemon artifact.
+The two are versioned independently. Keep `BARK_VERSION` aligned with the daemon release that the `bark-web` tag pins in `.env.mainnet`, `docker/checksums.env`, and `start9-app/Dockerfile`. The bundled `@secondts/barkd` JS client can be a patch ahead of that binary — client 0.7.2 is generated from daemon 0.7.1's spec — so the client version alone does not select the daemon artifact.
 
 The client is generated from the daemon's OpenAPI spec. Only move the daemon ahead of bark-web's own pin when `bark-rest/openapi.json` is unchanged between the two daemon tags apart from its `version` string:
 

@@ -132,7 +132,7 @@ The wallet itself is created by the web app. On first load it offers a choice: c
 
 Install raises three tasks, and the two backup ones are raised **once**, on install only — they are not re-created if the user later removes their targets. The ongoing indicator for that is the health check.
 
-**The order that matters:** set a password (nothing is reachable until then), acknowledge the backup risk, then add an external target. After the critical tasks clear, start the service from its controls — a fresh StartOS install leaves every service stopped. A user who stops after the first two has a working wallet with a local-only backup, which is the state the health check reports as failing.
+**The order that matters:** set a password (nothing is reachable until then), acknowledge the backup risk, then add an external target. After the critical tasks clear, start the service. A user who stops after the first two has a working wallet with a local-only backup, which is the state the health check reports as failing.
 
 ## Actions
 

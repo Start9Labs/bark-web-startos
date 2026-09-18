@@ -17,13 +17,12 @@ This package runs Bark on Bitcoin **mainnet**, connected to Second's hosted Ark 
 
 1. On first install StartOS prompts you with the **Set UI Password** task. Run it to generate your login password, then note it — you can re-run the task any time to rotate it (which also signs out any existing sessions).
 2. StartOS shows two backup tasks:
-   - a **critical** "Backup Safety" task explains how your wallet is backed up and asks you to acknowledge that you can lose funds without a current external backup and a safeguarded recovery phrase. This is required of everyone and clears only once you acknowledge it; and
-   - an **important** task recommends adding an external target via **Configure Backups** (see [Backups](#backups) below), and clears once you do.
-3. Start the service from its **Service Controls**. A fresh StartOS install leaves it stopped after the critical tasks are cleared.
-4. Open the **Web UI** interface from the service's **Dashboard** tab and log in with those credentials.
-5. The wallet asks whether to **create a new wallet** or **import an existing one**. Creating generates a fresh twelve-word recovery phrase, shows it to you, and asks you to confirm a few words back. Importing takes a phrase you already hold; the birthday-height field it offers can be left blank, because the chain source this package uses ignores it.
-6. Write your recovery phrase down and store it safely — it is the master key to your funds, and it is what decrypts your backups. If you skipped the confirmation step, or you are coming from an older version where the wallet was created for you, go to **Settings** in the wallet and reveal it there. Your seed can now rebuild your Ark balance on its own, but only with the Ark server's help; your continuous backup is the copy that does not depend on anyone else.
-7. Fund the wallet by receiving an on-chain deposit or an Ark payment.
+   - a **Required** "Backup Safety" task explains how your wallet is backed up and asks you to acknowledge that you can lose funds without a current external backup and a safeguarded recovery phrase. This is required of everyone and clears only once you acknowledge it; and
+   - a **Recommended** task suggests adding an external target via **Configure Backups** (see [Backups](#backups) below), and clears once you do.
+3. Start the service, then open the **Web UI** interface from the service's **Dashboard** tab and log in with those credentials.
+4. The wallet asks whether to **create a new wallet** or **import an existing one**. Creating generates a fresh twelve-word recovery phrase, shows it to you, and asks you to confirm a few words back. Importing takes a phrase you already hold; the birthday-height field it offers can be left blank, because the chain source this package uses ignores it.
+5. Write your recovery phrase down and store it safely — it is the master key to your funds, and it is what decrypts your backups. If you skipped the confirmation step, or you are coming from an older version where the wallet was created for you, go to **Settings** in the wallet and reveal it there. Your seed can now rebuild your Ark balance on its own, but only with the Ark server's help; your continuous backup is the copy that does not depend on anyone else.
+6. Fund the wallet by receiving an on-chain deposit or an Ark payment.
 
 ## Using Bark Wallet
 
