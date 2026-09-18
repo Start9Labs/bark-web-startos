@@ -5,7 +5,9 @@ This package wraps two upstream artifacts from the [ark-bitcoin](https://gitlab.
 - **`bark-web`** — the frontend GUI and its API proxy, built from a git tag (`BARK_WEB_VERSION`).
 - **`barkd`** — the wallet daemon, fetched as a release binary with a pinned SHA-256 (`BARK_VERSION`).
 
-The two are versioned independently, but the `bark-web` frontend bundles a `@secondts/barkd` JS client that must match the `barkd` daemon. Keep `BARK_VERSION` aligned with the client version `bark-web` ships — the client is generated from the daemon's OpenAPI spec, so a daemon patch release is only safe ahead of the client if `bark-rest/openapi.json` is unchanged between the two tags apart from its `version` string:
+The two are versioned independently. Keep `BARK_VERSION` aligned with the daemon release that the `bark-web` tag pins in `.env.mainnet`, `docker/checksums.env`, and `start9-app/Dockerfile`. The bundled `@secondts/barkd` JS client can be a patch ahead of that binary — bark-web 0.9.0 deliberately pairs client 0.7.2 with daemon 0.7.1 — so the client version alone does not select the daemon artifact.
+
+The client is generated from the daemon's OpenAPI spec. Only move the daemon ahead of bark-web's own pin when `bark-rest/openapi.json` is unchanged between the two daemon tags apart from its `version` string:
 
 ```sh
 curl -s 'https://gitlab.com/api/v4/projects/ark-bitcoin%2Fbark/repository/compare?from=bark-<old>&to=bark-<new>' \
@@ -20,7 +22,7 @@ curl -s 'https://gitlab.com/api/v4/projects/ark-bitcoin%2Fbark/repository/compar
   git ls-remote --tags https://gitlab.com/ark-bitcoin/bark-web.git | tail
   ```
 
-  Confirm the bundled daemon client version in that tag's `package-lock.json` under `node_modules/@secondts/barkd` — `BARK_VERSION` should match it.
+  Confirm the paired daemon release in that tag's `.env.mainnet`, `docker/checksums.env`, and `start9-app/Dockerfile`. Also record the bundled client version from `package-lock.json` under `node_modules/@secondts/barkd`; a patch difference is expected when upstream pins one.
 
 - **barkd** ([ark-bitcoin/bark](https://gitlab.com/ark-bitcoin/bark)) — release tags are named `bark-<version>`:
 
