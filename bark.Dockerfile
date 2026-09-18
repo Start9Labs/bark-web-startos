@@ -1,9 +1,10 @@
 # One image, three processes (barkd, node API, nginx) supervised individually by
 # StartOS. The bark-web frontend and its API proxy are built from the upstream
-# git tag; barkd is fetched as a release binary with a pinned checksum.
+# git tag; barkd and rclone are fetched as release binaries with pinned checksums.
 
 ARG BARK_WEB_VERSION=0.9.0
 ARG BARK_VERSION=0.7.1
+ARG RCLONE_VERSION=1.75.1
 
 # ---- Upstream source checkout ----
 FROM docker.io/debian:bookworm-slim AS source
@@ -50,12 +51,32 @@ RUN case "${TARGETARCH}" in \
     echo "${SHA}  barkd" | sha256sum -c - && \
     chmod +x barkd
 
+# ---- rclone binary fetch ----
+FROM docker.io/debian:bookworm-slim AS rclone-fetch
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl \
+    && rm -rf /var/lib/apt/lists/*
+ARG RCLONE_VERSION
+ARG TARGETARCH
+ARG RCLONE_SHA256_AMD64=09c9f7606ed9e31eecc1eec26a89992cf2931a8d2d1a5f0ae2bb1c11630ffb15
+ARG RCLONE_SHA256_ARM64=773f3a76615f91f7d4654183a537afddce3343c8d99ac1d74984f060f2ade2d9
+WORKDIR /out
+RUN case "${TARGETARCH}" in \
+      amd64) SHA="${RCLONE_SHA256_AMD64}" ;; \
+      arm64) SHA="${RCLONE_SHA256_ARM64}" ;; \
+      *)     echo "Unsupported architecture: ${TARGETARCH}" && exit 1 ;; \
+    esac && \
+    curl -fsSL --retry 5 --retry-all-errors --retry-delay 3 \
+      "https://downloads.rclone.org/v${RCLONE_VERSION}/rclone-v${RCLONE_VERSION}-linux-${TARGETARCH}.deb" -o rclone.deb && \
+    echo "${SHA}  rclone.deb" | sha256sum -c - && \
+    dpkg-deb -x rclone.deb extract && \
+    install -m 0755 extract/usr/bin/rclone rclone
+
 # ---- Final runtime ----
 FROM docker.io/debian:bookworm-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates curl nginx \
-      rclone sqlite3 inotify-tools jq openssl \
+      sqlite3 inotify-tools jq openssl \
     && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && apt-get install -y --no-install-recommends nodejs \
     && rm -rf /var/lib/apt/lists/*
@@ -67,6 +88,7 @@ COPY --from=api-prod-deps /app/api/node_modules /app/api/node_modules
 COPY --from=api-prod-deps /app/api/package.json /app/api/package.json
 COPY --from=api-builder /app/api/dist /app/api/dist
 COPY --from=barkd-fetch /out/barkd /usr/local/bin/barkd
+COPY --from=rclone-fetch /out/rclone /usr/local/bin/rclone
 
 # Continuous external backup agent (see startos/main.ts, backup-agent.sh).
 COPY backup-agent.sh /usr/local/bin/backup-agent.sh

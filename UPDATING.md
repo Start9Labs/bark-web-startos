@@ -1,11 +1,12 @@
 # Updating the upstream version
 
-This package wraps two upstream artifacts from the [ark-bitcoin](https://gitlab.com/ark-bitcoin) project, both pinned in `bark.Dockerfile`:
+This package pins three upstream artifacts in `bark.Dockerfile`:
 
 - **`bark-web`** — the frontend GUI and its API proxy, built from a git tag (`BARK_WEB_VERSION`).
 - **`barkd`** — the wallet daemon, fetched as a release binary with a pinned SHA-256 (`BARK_VERSION`).
+- **`rclone`** — the backup agent's transfer tool, fetched as a release `.deb` with a pinned SHA-256 (`RCLONE_VERSION`). It moves on its own cadence, independent of the two above.
 
-The two are versioned independently. Keep `BARK_VERSION` aligned with the daemon release that the `bark-web` tag pins in `.env.mainnet`, `docker/checksums.env`, and `start9-app/Dockerfile`. The bundled `@secondts/barkd` JS client can be a patch ahead of that binary — client 0.7.2 is generated from daemon 0.7.1's spec — so the client version alone does not select the daemon artifact.
+`bark-web` and `barkd` are versioned independently. Keep `BARK_VERSION` aligned with the daemon release that the `bark-web` tag pins in `.env.mainnet`, `docker/checksums.env`, and `start9-app/Dockerfile`. The bundled `@secondts/barkd` JS client can be a patch ahead of that binary — client 0.7.2 is generated from daemon 0.7.1's spec — so the client version alone does not select the daemon artifact.
 
 The client is generated from the daemon's OpenAPI spec. Only move the daemon ahead of bark-web's own pin when `bark-rest/openapi.json` is unchanged between the two daemon tags apart from its `version` string:
 
@@ -30,6 +31,12 @@ curl -s 'https://gitlab.com/api/v4/projects/ark-bitcoin%2Fbark/repository/compar
   curl -s 'https://gitlab.com/api/v4/projects/ark-bitcoin%2Fbark/releases?per_page=5' | jq -r '.[].tag_name'
   ```
 
+- **rclone** ([rclone/rclone](https://github.com/rclone/rclone)) — latest stable release:
+
+  ```sh
+  curl -s https://downloads.rclone.org/version.txt
+  ```
+
 ## Applying the bump
 
 1. In `bark.Dockerfile`, update the `ARG BARK_WEB_VERSION` and `ARG BARK_VERSION` defaults.
@@ -42,5 +49,13 @@ curl -s 'https://gitlab.com/api/v4/projects/ark-bitcoin%2Fbark/repository/compar
 
    Put the `x86_64` hash in `BARKD_SHA256_AMD64` and the `arm64` hash in `BARKD_SHA256_ARM64`.
 
-3. Bump `version` and `releaseNotes` in `startos/versions/current.ts`.
-4. Run `make` and verify the build succeeds.
+3. For rclone, update `ARG RCLONE_VERSION` and refresh both checksums from the release `SHA256SUMS`:
+
+   ```sh
+   curl -fsSL "https://downloads.rclone.org/v<version>/SHA256SUMS" | grep -E 'linux-(amd64|arm64)\.deb'
+   ```
+
+   Put the `amd64` hash in `RCLONE_SHA256_AMD64` and the `arm64` hash in `RCLONE_SHA256_ARM64`.
+
+4. Bump `version` and `releaseNotes` in `startos/versions/current.ts`.
+5. Run `make` and verify the build succeeds.

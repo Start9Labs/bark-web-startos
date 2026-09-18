@@ -50,7 +50,7 @@ One image, built here, running five daemons that StartOS supervises independentl
 | `nginx-sub`        | nginx         | 8080          | Serves the app and proxies to the API                 |
 | `backup-agent-sub` | A shell agent | —             | Watches the wallet database and ships snapshots       |
 
-The `barkd` binary is fetched from the upstream release with a pinned checksum; the web app and API are built from the upstream tag.
+The `barkd` and `rclone` binaries are fetched from their upstream releases with pinned checksums; the web app and API are built from the upstream tag.
 
 **`--expose-mnemonic` is passed to `barkd` and is load-bearing.** Upstream made the mnemonic endpoint opt-in and 404 by default, and the wallet's Settings screen is the only place a user can read their recovery phrase after onboarding: a wallet created before this release was generated for them and never displayed one, the create flow lets them skip the confirmation step, and an imported wallet never shows it at all. Without the flag such a user could never record the seed that both recovers their funds and decrypts their backups. It is safe because the endpoint is reachable only through the API's session-guarded route, on a daemon bound to loopback behind a bearer token.
 
