@@ -174,7 +174,7 @@ export const main = sdk.setupMain(async ({ effects }) => {
     })
     .addHealthCheck('backup-status', {
       ready: {
-        display: 'Wallet Backup',
+        display: 'Continuous Backup',
         fn: async () => {
           const cfg = await backupConfigJson
             .read()
@@ -193,7 +193,7 @@ export const main = sdk.setupMain(async ({ effects }) => {
             return {
               result: 'failure',
               message:
-                'No external backup target. Your wallet is only backed up locally, recoverable only from a StartOS backup you take manually — likely stale when you need it, risking Ark/Lightning funds received or moved since. Add an off-box target under Actions → Backups.',
+                'No external target. The continuous backup stays on this server only, recoverable only from a StartOS backup you take manually — likely stale when you need it, risking Ark/Lightning funds received or moved since. Add an external target under Actions → Continuous Backups.',
             }
           const st = await backupStateJson
             .read()

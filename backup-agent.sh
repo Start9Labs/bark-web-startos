@@ -37,6 +37,7 @@ SNAP="$WORK/snap.sqlite"
 RCONF="$WORK/rclone.conf"
 ENC_NAME=wallet.db         # logical object name inside each crypt remote
 META_NAME=wallet.meta      # per-target freshness marker (encrypted alongside)
+WALLET_ID=''               # this wallet's folder on every external target
 
 BACKSTOP=300        # seconds; unconditional snapshot cadence (catches silent
                     # on-chain mutations and inotify gaps)
@@ -69,8 +70,17 @@ remotes() {
     printf '%s:%s\n' "$_p" "$_pp"
   done
 }
-# All ship/restore targets: the always-on local backup plus any external ones.
+# All ship targets: the always-on local backup plus any external ones.
 all_targets() { printf '%s\n' "$LOCAL_REMOTE"; remotes; }
+# "target:crypt section" for every copy restore may read: each external
+# target's own folder and its folder root.
+restore_sources() {
+  printf 'local:local_enc\n'
+  for _remote in $(remotes); do
+    _name=$(echo "$_remote" | cut -d: -f1)
+    printf '%s:%s_enc\n%s:%s_legacy\n' "$_name" "$_name" "$_name" "$_name"
+  done
+}
 # A target the user marked as trusting a self-signed cert (LAN Nextcloud, etc.).
 # The snapshot is already client-side encrypted, so skipping TLS verification
 # only ever exposes ciphertext. Echoes the rclone flag to add, or nothing.
@@ -84,6 +94,29 @@ derive() { # context -> base64 key
   printf '%s' "$(cat "$MNEMONIC")" | openssl dgst -sha256 -hmac "$1" -binary | base64 | tr -d '\n'
 }
 
+# An HMAC of the mnemonic names the wallet's folder on every external target,
+# so wallets sharing an account never overwrite each other and the name tells
+# the target nothing.
+wallet_id() {
+  [ -n "$WALLET_ID" ] && return 0
+  _id=$(printf '%s' "$(cat "$MNEMONIC")" | openssl dgst -sha256 -hmac bark-backup-id-v1 -binary | od -An -tx1 | tr -d ' \n') || return 1
+  printf '%s' "$_id" | grep -Eq '^[0-9a-f]{64}$' || return 1
+  WALLET_ID=$_id
+}
+
+crypt_section() { # section name, underlying remote
+  cat >> "$RCONF" <<EOF
+
+[$1]
+type = crypt
+remote = $2
+password = $_pw
+password2 = $_pw2
+filename_encryption = off
+directory_name_encryption = false
+EOF
+}
+
 # Build an effective rclone.conf from the STRUCTURED config: one section per
 # enabled target, plus one crypt wrapper per target (<name>_enc). rclone does
 # encrypt+upload / download+decrypt in one step, so we never handle ciphertext
@@ -92,6 +125,7 @@ derive() { # context -> base64 key
 # TS side never round-trips through an obscure/reveal heuristic.
 build_conf() {
   mkdir -p "$WORK"
+  wallet_id || return 1
   # Always-on local backend (no credentials).
   printf '[local]\ntype = local\n' > "$RCONF"
   if [ "$(cfg '.gdrive.enabled // false')" = true ]; then
@@ -121,19 +155,13 @@ build_conf() {
   fi
   _pw=$(rclone obscure "$(derive bark-backup-crypt-v1)")
   _pw2=$(rclone obscure "$(derive bark-backup-salt-v1)")
-  for _remote in $(all_targets); do
+  crypt_section local_enc "$LOCAL_REMOTE"
+  # <name>_legacy is the root copies landed in before wallets had a folder.
+  for _remote in $(remotes); do
     _name=$(echo "$_remote" | cut -d: -f1)
     _path=$(echo "$_remote" | cut -d: -f2-)
-    cat >> "$RCONF" <<EOF
-
-[${_name}_enc]
-type = crypt
-remote = ${_name}:${_path}
-password = $_pw
-password2 = $_pw2
-filename_encryption = off
-directory_name_encryption = false
-EOF
+    crypt_section "${_name}_enc" "${_name}:${_path}/${WALLET_ID}"
+    crypt_section "${_name}_legacy" "${_name}:${_path}"
   done
 }
 
@@ -198,7 +226,12 @@ do_backup() {
     rm -f "$SNAP"
     return 0
   fi
-  build_conf
+  build_conf || {
+    rm -f "$SNAP"
+    log "wallet identity could not be derived"
+    state_set_str lastError "wallet identity could not be derived"
+    return 1
+  }
   # Generation = ship time. "Freshest = max gen" lets restore pick the newest
   # target and detect a rolled-back one (target gen < watermark).
   _gen=$(date +%s)
@@ -251,24 +284,27 @@ do_restore() {
   fi
   log "restore pending: locating the freshest wallet snapshot"
   if [ ! -f "$MNEMONIC" ]; then log "no mnemonic restored; starting fresh"; clear_flag; exit 0; fi
-  build_conf
+  build_conf || { log "wallet identity could not be derived (will retry next start)"; exit 0; }
   _floor=$(numor0 "$(jq -r '.gen // 0' "$WATERMARK" 2>/dev/null || echo 0)")
 
-  # Collect "<gen> <remote>" for every reachable target (local + externals).
+  # Collect "<gen> <target> <section>" for every reachable copy.
   : > "$WORK/gens"
-  for _remote in $(all_targets); do
-    _name=$(echo "$_remote" | cut -d: -f1)
-    remote_is_onion "$_name" && { log "[$_name] skipped (.onion unsupported)"; continue; }
+  for _src in $(restore_sources); do
+    _name=${_src%%:*}
+    _section=${_src#*:}
+    _label=$_name
+    [ "${_section%_legacy}" = "$_section" ] || _label="$_name root"
+    remote_is_onion "$_name" && { log "[$_label] skipped (.onion unsupported)"; continue; }
     rm -f "$WORK/m.json"
     _extra=$(tls_flag "$_name")
     # shellcheck disable=SC2086
-    if rclone --config "$RCONF" copyto "${_name}_enc:$META_NAME" "$WORK/m.json" $RCLONE_FLAGS $_extra 2>/dev/null; then
+    if rclone --config "$RCONF" copyto "${_section}:$META_NAME" "$WORK/m.json" $RCLONE_FLAGS $_extra 2>/dev/null; then
       _g=$(numor0 "$(jq -r '.gen // 0' "$WORK/m.json" 2>/dev/null || echo 0)")
     else
       _g=0 # no marker (pre-marker backup, or marker missing) — freshness unknown
     fi
-    log "[$_name] available snapshot gen=$_g"
-    echo "$_g $_remote" >> "$WORK/gens"
+    log "[$_label] available snapshot gen=$_g"
+    echo "$_g $_name $_section" >> "$WORK/gens"
   done
   if [ ! -s "$WORK/gens" ]; then
     log "no reachable targets; barkd will start fresh (will retry next start)"; exit 0
@@ -285,26 +321,26 @@ do_restore() {
     exit 0
   fi
 
-  # Seed from the freshest target that pulls + verifies.
-  while read -r _g _remote; do
-    _name=$(echo "$_remote" | cut -d: -f1)
-    remote_is_onion "$_name" && continue
-    log "[$_name] pulling + decrypting snapshot (gen=$_g)..."
+  # Seed from the freshest copy that pulls + verifies.
+  while read -r _g _name _section; do
+    _label=$_name
+    [ "${_section%_legacy}" = "$_section" ] || _label="$_name root"
+    log "[$_label] pulling + decrypting snapshot (gen=$_g)..."
     rm -f "$WALLET_DIR/db.sqlite.restored"
     _extra=$(tls_flag "$_name")
     # shellcheck disable=SC2086
-    _out=$(rclone --config "$RCONF" copyto "${_name}_enc:$ENC_NAME" "$WALLET_DIR/db.sqlite.restored" $RCLONE_FLAGS $_extra 2>&1)
+    _out=$(rclone --config "$RCONF" copyto "${_section}:$ENC_NAME" "$WALLET_DIR/db.sqlite.restored" $RCLONE_FLAGS $_extra 2>&1)
     if [ $? -ne 0 ]; then
-      log "[$_name] pull/decrypt failed: $(echo "$_out" | tail -n 2 | tr '\n' ' ')"; continue
+      log "[$_label] pull/decrypt failed: $(echo "$_out" | tail -n 2 | tr '\n' ' ')"; continue
     fi
     if sqlite3 "$WALLET_DIR/db.sqlite.restored" "PRAGMA integrity_check" 2>/dev/null | grep -qi '^ok$'; then
       mv "$WALLET_DIR/db.sqlite.restored" "$DB"
       printf '{"gen":%s}\n' "$_g" > "$WATERMARK"
       clear_flag
-      log "[$_name] restored db.sqlite from freshest snapshot (gen=$_g)"
+      log "[$_label] restored db.sqlite from freshest snapshot (gen=$_g)"
       exit 0
     fi
-    log "[$_name] integrity check failed on decrypted DB"
+    log "[$_label] integrity check failed on decrypted DB"
     rm -f "$WALLET_DIR/db.sqlite.restored"
   done < "$WORK/gens.sorted"
 

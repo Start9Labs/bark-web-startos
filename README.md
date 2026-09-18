@@ -62,19 +62,19 @@ One volume, and where a file sits on it decides whether it is backed up.
 | ------ | ----------- | -------------------------------------------- |
 | `main` | `/data`     | Wallet data, UI-auth files, and backup state |
 
-| Path                       | Written by | Holds                                                     |
-| -------------------------- | ---------- | --------------------------------------------------------- |
-| `.bark/db.sqlite`          | `barkd`    | The wallet database — **excluded** from the native backup |
-| `.bark/mnemonic`           | `barkd`    | The seed                                                  |
-| `.bark/auth_token`         | `barkd`    | The bearer token; never reaches the browser               |
-| `.bark/debug.log`          | `barkd`    | Debug log — capped, and excluded from the native backup   |
-| `.bark/.backup-state.json` | The agent  | Backup status — excluded from the native backup           |
-| `ui_password`              | An action  | The web login password                                    |
-| `ui_session_secret`        | The API    | Session signing key — excluded from the native backup     |
-| `backup-config.json`       | An action  | External backup targets and their credentials             |
-| `startupFlags.json`        | Restore    | The one-shot pending-restore flag                         |
-| `backup-watermark.json`    | The agent  | The newest generation shipped, for rollback detection     |
-| `local-backups/`           | The agent  | Encrypted snapshots of the always-on local backup         |
+| Path                       | Written by | Holds                                                      |
+| -------------------------- | ---------- | ---------------------------------------------------------- |
+| `.bark/db.sqlite`          | `barkd`    | The wallet database — **excluded** from the StartOS backup |
+| `.bark/mnemonic`           | `barkd`    | The seed                                                   |
+| `.bark/auth_token`         | `barkd`    | The bearer token; never reaches the browser                |
+| `.bark/debug.log`          | `barkd`    | Debug log — capped, and excluded from the StartOS backup   |
+| `.bark/.backup-state.json` | The agent  | Backup status — excluded from the StartOS backup           |
+| `ui_password`              | An action  | The web login password                                     |
+| `ui_session_secret`        | The API    | Session signing key — excluded from the StartOS backup     |
+| `backup-config.json`       | An action  | Continuous-backup targets and their credentials            |
+| `startupFlags.json`        | Restore    | The one-shot pending-restore flag                          |
+| `backup-watermark.json`    | The agent  | The newest generation shipped, for rollback detection      |
+| `local-backups/`           | The agent  | Encrypted snapshots of the always-on local backup          |
 
 **The UI-auth files sit at the volume root, not in `barkd`'s directory, and that is not tidiness.** `barkd` treats its data directory as wallet-owned and aborts wallet creation if it finds any file it does not recognise there. Keeping `ui_password` and `ui_session_secret` as siblings of `.bark/` leaves that directory clean.
 
@@ -82,12 +82,12 @@ One volume, and where a file sits on it decides whether it is backed up.
 
 Four models, and the interesting thing about them is that the largest file on the volume is deliberately _not_ one.
 
-| File                       | Format | Modelled                  | Written by                      |
-| -------------------------- | ------ | ------------------------- | ------------------------------- |
-| `ui_password`              | text   | Yes — `FileHelper.string` | The Set UI Password action      |
-| `backup-config.json`       | JSON   | Yes — `FileHelper.json`   | The Configure Backups action    |
-| `.bark/.backup-state.json` | JSON   | Yes — `FileHelper.json`   | The backup agent                |
-| `startupFlags.json`        | JSON   | Yes — `FileHelper.json`   | Restore, consumed at next start |
+| File                       | Format | Modelled                  | Written by                              |
+| -------------------------- | ------ | ------------------------- | --------------------------------------- |
+| `ui_password`              | text   | Yes — `FileHelper.string` | The Set UI Password action              |
+| `backup-config.json`       | JSON   | Yes — `FileHelper.json`   | The Configure Continuous Backups action |
+| `.bark/.backup-state.json` | JSON   | Yes — `FileHelper.json`   | The backup agent                        |
+| `startupFlags.json`        | JSON   | Yes — `FileHelper.json`   | Restore, consumed at next start         |
 
 **`ui_password`** is the canonical login password, read live by the API on every request rather than loaded once. `main` holds a reactive read of it, so rotating the password restarts the API — and because the session signature folds the password in, a rotation invalidates every existing session immediately.
 
@@ -95,7 +95,7 @@ Four models, and the interesting thing about them is that the largest file on th
 
 Toggling a target off keeps its credentials, so re-enabling never means re-typing them.
 
-**`.backup-state.json`** is runtime status, written by the agent and read by the health check. It is excluded from the native backup precisely so a stale status can never travel into a restore and look current.
+**`.backup-state.json`** is runtime status, written by the agent and read by the health check. It is excluded from the StartOS backup precisely so a stale status can never travel into a restore and look current.
 
 **`startupFlags.json`** carries one flag, set by the post-restore hook and consumed by the oneshot that pulls the wallet database back before `barkd` opens it.
 
@@ -147,7 +147,7 @@ Generates a new random password for the web login and shows it once. Run it when
 - **Repeat safety:** idempotent in effect, but each run produces a new password and invalidates the old one.
 - **Outputs:** the password, shown once.
 
-### Backup Safety — Backups group
+### Backup Safety — Continuous Backups group
 
 A required acknowledgement, not a setting. Run it when its critical task appears.
 
@@ -156,18 +156,19 @@ A required acknowledgement, not a setting. Run it when its critical task appears
 - **It will refuse to complete unless you accept** — submitting without accepting throws.
 - **It is required regardless of your backup configuration.** Adding an external target does not clear it, because the point is that the user has understood the risk, not that they have mitigated it.
 
-### Configure Backups — Backups group
+### Configure Continuous Backups — Continuous Backups group
 
-Adds encrypted off-box targets: Google Drive, Dropbox, Nextcloud, or SFTP. Run it during setup, and again to add, change, or disable a target.
+A continuous backup is the encrypted wallet snapshot the agent keeps current on every target, as opposed to the point-in-time StartOS backup. This action adds the external targets — Google Drive, Dropbox, Nextcloud, or SFTP — beside the local copy that always runs. Run it during setup, and again to add, change, or disable a target.
 
 - **What it changes:** `backup-config.json`.
 - **Cost:** immediate; available at any status.
 - **Repeat safety:** idempotent. Entries are saved even for targets left disabled, and disabling one keeps its credentials.
 - **Google Drive and Dropbox take two passes** — submit once with app credentials to get a sign-in link, approve it, then paste the returned code back into the form.
 - **A Nextcloud on the LAN with a self-signed certificate** needs the trust toggle enabled.
+- **A Nextcloud address is completed to `/remote.php/dav/files/USER/`**, where Nextcloud serves a user's files over WebDAV — a bare server address, the `/remote.php/dav/` interface the StartOS Nextcloud package exports, or `/remote.php/webdav` all become that, while an address already naming `/dav/files/` is kept as pasted.
 - **What to do next:** run Back Up Now to confirm the target works, then take a StartOS backup — the config is the pointer a restore needs.
 
-### Back Up Now — Backups group
+### Back Up Now — Continuous Backups group
 
 Forces an immediate snapshot and upload. Run it to verify a newly configured target.
 
@@ -179,15 +180,15 @@ Forces an immediate snapshot and upload. Run it to verify a newly configured tar
 
 Three, and they differ in whether they can come back.
 
-| Task                | Severity    | Raised when                          | Cleared when                    |
-| ------------------- | ----------- | ------------------------------------ | ------------------------------- |
-| Set UI Password     | `critical`  | Any init that finds no password file | Set UI Password runs            |
-| Backup Safety       | `critical`  | At install only                      | The acknowledgement is accepted |
-| Add a backup target | `important` | At install only                      | Configure Backups runs          |
+| Task                | Severity    | Raised when                          | Cleared when                      |
+| ------------------- | ----------- | ------------------------------------ | --------------------------------- |
+| Set UI Password     | `critical`  | Any init that finds no password file | Set UI Password runs              |
+| Backup Safety       | `critical`  | At install only                      | The acknowledgement is accepted   |
+| Add a backup target | `important` | At install only                      | Configure Continuous Backups runs |
 
 The password task is **reactive** — it is re-raised on any init that finds no password, so deleting the file brings the prompt back rather than leaving an unreachable service.
 
-The two backup tasks are raised on install alone. That is deliberate: they are onboarding, and re-raising them every time a user changed their mind about a target would be nagging. The **Wallet Backup** health check is the ongoing indicator instead.
+The two backup tasks are raised on install alone. That is deliberate: they are onboarding, and re-raising them every time a user changed their mind about a target would be nagging. The **Continuous Backup** health check is the ongoing indicator instead.
 
 `critical` blocks the service from starting and suspends the ordinary controls, so a fresh install shows tasks and nothing else.
 
@@ -195,16 +196,16 @@ The two backup tasks are raised on install alone. That is deliberate: they are o
 
 Six checks, but only two are shown. The rest pass no display — they exist so a failing daemon restarts the service, not to be read.
 
-| Check           | Displayed as    | Method                                |
-| --------------- | --------------- | ------------------------------------- |
-| `nginx`         | "Web Interface" | Port 8080 is listening                |
-| `backup-status` | "Wallet Backup" | The backup configuration and state    |
-| `barkd`         | — internal      | Port 4000 is listening                |
-| `api`           | — internal      | Port 4001 is listening                |
-| `backup-agent`  | — internal      | Always succeeds while the agent runs  |
-| `log-cap`       | — internal      | Always succeeds while the capper runs |
+| Check           | Displayed as        | Method                                |
+| --------------- | ------------------- | ------------------------------------- |
+| `nginx`         | "Web Interface"     | Port 8080 is listening                |
+| `backup-status` | "Continuous Backup" | The backup configuration and state    |
+| `barkd`         | — internal          | Port 4000 is listening                |
+| `api`           | — internal          | Port 4001 is listening                |
+| `backup-agent`  | — internal          | Always succeeds while the agent runs  |
+| `log-cap`       | — internal          | Always succeeds while the capper runs |
 
-**"Wallet Backup" reports failure when no external target is configured**, and that is a deliberate judgement rather than a fault. A local backup always runs, but recovering it depends on a manual StartOS backup, so it is likely stale exactly when it is needed — which for an Ark wallet risks funds received or moved since. The check says so in its message and points at the action.
+**"Continuous Backup" reports failure when no external target is configured**, and that is a deliberate judgement rather than a fault. A local backup always runs, but recovering it depends on a manual StartOS backup, so it is likely stale exactly when it is needed — which for an Ark wallet risks funds received or moved since. The check says so in its message and points at the action.
 
 With an external target configured it reports the age of the last successful backup, and turns to failure only when a backup has been failing for more than half an hour. A configured target that has not shipped anything yet reports success with an explanation, rather than sitting on a spinner — a wallet with no activity has nothing to back up.
 
@@ -214,16 +215,16 @@ A service restarting with no failing check displayed is one of the internal daem
 
 **The wallet database is deliberately excluded from the StartOS backup**, and this is the most important thing to understand about this package.
 
-A native backup is point-in-time and stops the service, so it cannot capture a rolling wallet database safely — and for an Ark wallet a stale database is not an inconvenience, it is fund loss: every Ark or Lightning payment advances the wallet state, so restoring an old copy rolls the wallet back past payments it has already made.
+A StartOS backup is point-in-time and stops the service, so it cannot capture a rolling wallet database safely — and for an Ark wallet a stale database is not an inconvenience, it is fund loss: every Ark or Lightning payment advances the wallet state, so restoring an old copy rolls the wallet back past payments it has already made.
 
 So the two halves are split:
 
-- **The backup agent ships the database continuously**, encrypted with a key derived from the seed, to every enabled target — plus, always, to an on-box local copy. It snapshots on change with a periodic backstop.
-- **The native StartOS backup keeps the small, static remainder**: the seed, the bearer token, the login password, the backup configuration, the freshness watermark, and the local snapshots.
+- **The backup agent ships the database continuously**, encrypted with a key derived from the seed, to every enabled target — plus, always, to an on-box local copy. It snapshots on change with a periodic backstop. On an external target the snapshot and its freshness marker sit at `<folder>/<wallet id>/`, the wallet id being an HMAC of the mnemonic, so wallets that share an account stay apart and the name tells the target nothing; the local copy stays at `/data/local-backups`.
+- **The StartOS backup keeps the small, static remainder**: the seed, the bearer token, the login password, the backup configuration, the freshness watermark, and the local snapshots.
 
-Excluded from the native backup: the database and its journals, the backup status file, `barkd`'s debug log, and the session secret — the last so that a restore regenerates it and forces a clean re-login.
+Excluded from the StartOS backup: the database and its journals, the backup status file, `barkd`'s debug log, and the session secret — the last so that a restore regenerates it and forces a clean re-login.
 
-**Restore pulls the newest copy, and refuses a stale one.** The post-restore hook sets a flag; on the next start, a oneshot fetches and decrypts the freshest snapshot from the configured targets and writes the database _before_ `barkd` opens it. If the newest copy it finds is older than the watermark it restored, it **refuses to load it** rather than reverting the wallet — which is what makes a rolled-back backup target survivable. Two independent targets mean a rolled-back one is outvoted.
+**Restore pulls the newest copy, and refuses a stale one.** The post-restore hook sets a flag; on the next start, a oneshot fetches and decrypts the freshest snapshot from the configured targets — each target's wallet folder and, for copies made before wallets had one, its folder root — and writes the database _before_ `barkd` opens it. If the newest copy it finds is older than the watermark it restored, it **refuses to load it** rather than reverting the wallet — which is what makes a rolled-back backup target survivable. Two independent targets mean a rolled-back one is outvoted.
 
 With no target ever configured, or none reachable, the wallet starts from the seed alone: on-chain funds, plus whatever Ark balance the server's recovery mailbox can rebuild.
 
@@ -287,7 +288,7 @@ tasks:
   - { action: configure-backup, severity: important } # install only
 health_checks:
   - nginx # displayed "Web Interface"
-  - backup-status # displayed "Wallet Backup"
+  - backup-status # displayed "Continuous Backup"
   - barkd # internal
   - api # internal
   - backup-agent # internal

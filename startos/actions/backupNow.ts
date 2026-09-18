@@ -13,7 +13,7 @@ export const backupNow = sdk.Action.withoutInput(
       'Immediately snapshot, encrypt, and ship the wallet database to the local backup and any configured external targets.',
     warning: null,
     allowedStatuses: 'only-running',
-    group: 'Backups',
+    group: 'Continuous Backups',
     visibility: 'enabled',
   }),
 

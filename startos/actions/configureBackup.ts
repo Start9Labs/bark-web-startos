@@ -2,7 +2,7 @@ import * as https from 'https'
 import { URLSearchParams } from 'url'
 import { backupConfigJson } from '../fileModels/backupConfig.json'
 import { sdk } from '../sdk'
-import { backupFolderDefault } from '../utils'
+import { backupFolderDefault, nextcloudDavUrl } from '../utils'
 
 // Unlike LND's channel.backup (which LND pre-encrypts with the seed), the Bark
 // wallet DB is plaintext, so the backup-agent encrypts each snapshot with a key
@@ -221,7 +221,7 @@ const WARNING = `<b>⚠ A StartOS backup is what makes these restorable.</b> You
 <b>Setup:</b>
 <ul>
 <li><b>SFTP</b>: point at any always-on SSH server (NAS, Raspberry Pi, VPS). Password or SSH key auth. Use a relative folder path (no leading /) to land in the home directory.</li>
-<li><b>Nextcloud</b>: create an app password under Settings → Security; use the WebDAV URL https://your.host/remote.php/dav/files/USERNAME/. For a LAN server with a self-signed certificate, turn on "Trust self-signed certificate".</li>
+<li><b>Nextcloud</b>: create an app password under Settings → Security; the address is the one you open Nextcloud at (its WebDAV address works too). For a LAN server with a self-signed certificate, turn on "Trust self-signed certificate".</li>
 <li><b>Dropbox</b>: create a Scoped/App-folder app, enable files.content.read+write, then supply App Key + App Secret and enable this target. Submit once — you'll get a Dropbox link; approve it and paste the <b>authorization code Dropbox shows you</b> (not a "Generated access token") into the Authorization Code field, then submit again.</li>
 <li><b>Google Drive</b>: create an OAuth Desktop client (Drive API enabled), then supply Client ID + Client Secret and enable this target. Submit once for a Google sign-in link; approve it, then paste the <b>code</b> from the redirected localhost URL (paste it as-is — no need to hand-edit %2F) and submit again.</li>
 <li>Prefer credentials over browser flows? Paste an existing <b>Refresh Token</b> for Google/Dropbox instead of an authorization code.</li>
@@ -230,7 +230,7 @@ const WARNING = `<b>⚠ A StartOS backup is what makes these restorable.</b> You
 const enabledToggle = () =>
   sdk.Value.toggle({
     name: 'Enabled',
-    description: 'Send wallet backups to this target.',
+    description: 'Keep a continuous backup on this target.',
     default: false,
   })
 
@@ -312,8 +312,9 @@ const dropboxFields = {
 
 const nextcloudFields = {
   'nextcloud-url': sdk.Value.text({
-    name: 'WebDAV URL',
-    description: 'e.g. https://your.host/remote.php/dav/files/USERNAME/',
+    name: 'Address',
+    description:
+      'The address you open Nextcloud at, such as https://cloud.example.com. Its WebDAV address works too.',
     default: '',
     required: false,
   }),
@@ -451,12 +452,12 @@ export const configureBackup = sdk.Action.withInput(
   'configure-backup',
 
   async ({ effects }) => ({
-    name: 'Configure Backups',
+    name: 'Configure Continuous Backups',
     description:
-      'Add encrypted, off-box backup targets (Drive, Dropbox, Nextcloud, SFTP). A local on-box backup always runs too. Requires a StartOS backup to be restorable — take one after enabling a target. Toggle a target off to keep its settings.',
+      'Add external targets (Drive, Dropbox, Nextcloud, SFTP) for the continuous backup, which always keeps a local copy on this server too. Requires a StartOS backup to be restorable — take one after enabling a target. Toggle a target off to keep its settings. Each wallet gets its own folder inside the one you name, so several wallets can share a target.',
     warning: WARNING,
     allowedStatuses: 'any',
-    group: 'Backups',
+    group: 'Continuous Backups',
     visibility: 'enabled',
   }),
 
@@ -578,7 +579,7 @@ export const configureBackup = sdk.Action.withInput(
           )
         patch[provider] = { enabled, clientId, clientSecret, token, path }
       } else if (provider === 'nextcloud') {
-        const url = o['nextcloud-url']?.trim() || prev.url || ''
+        let url = o['nextcloud-url']?.trim() || prev.url || ''
         const user = o['nextcloud-user']?.trim() || prev.user || ''
         const pass = o['nextcloud-pass']?.trim() || prev.pass || null
         const insecureTls = !!o['nextcloud-insecure-tls']
@@ -589,9 +590,10 @@ export const configureBackup = sdk.Action.withInput(
           rejectLoopback(url, 'Nextcloud')
           if (!url || !user || !pass)
             throw new Error(
-              'Nextcloud: URL, username, and password are required.',
+              'Nextcloud: address, username, and password are required.',
             )
         }
+        if (url) url = nextcloudDavUrl(url, user)
         patch.nextcloud = { enabled, url, user, pass, insecureTls, path }
       } else {
         // sftp
@@ -633,16 +635,16 @@ export const configureBackup = sdk.Action.withInput(
         version: '1',
         title: 'No External Target',
         message:
-          'No external backup target is enabled. A local backup still runs on this server, but it is recoverable only from a manual StartOS backup and is likely stale when you need it — add an off-box target, which stays current. Saved target settings were kept.',
+          'No external target is enabled. The continuous backup still keeps a local copy on this server, but that is recoverable only from a manual StartOS backup and is likely stale when you need it — add an external target, which stays current. Saved target settings were kept.',
         result: null,
       }
     }
     return {
       version: '1',
-      title: 'External Backup Enabled',
+      title: 'External Target Enabled',
       message: `Your wallet database will be snapshotted, encrypted with your seed-derived key, and shipped to: ${enabledList.join(
         ', ',
-      )} (plus the always-on local copy). Run "Back Up Now" to verify, and check the Wallet Backup health status for per-target results.`,
+      )} (plus the always-on local copy). Run "Back Up Now" to verify, and check the Continuous Backup health check for per-target results.`,
       result: null,
     }
   },
