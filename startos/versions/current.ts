@@ -51,7 +51,14 @@ Les actions de sauvegarde et le contrôle de santé apparaissent désormais sous
           })
       }
       // The next cycle ships to the wallet's folder even if nothing changed.
-      await backupStateJson.merge(effects, { lastHash: null })
+      // Only a hash that is set is cleared: a file barkd does not know in its
+      // datadir blocks wallet creation.
+      const state = await backupStateJson
+        .read()
+        .once()
+        .catch(() => null)
+      if (state?.lastHash)
+        await backupStateJson.merge(effects, { lastHash: null })
     },
   },
 })

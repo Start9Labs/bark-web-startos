@@ -165,7 +165,7 @@ A continuous backup is the encrypted wallet snapshot the agent keeps current on 
 - **Repeat safety:** idempotent. Entries are saved even for targets left disabled, and disabling one keeps its credentials.
 - **Google Drive and Dropbox take two passes** — submit once with app credentials to get a sign-in link, approve it, then paste the returned code back into the form.
 - **A Nextcloud on the LAN with a self-signed certificate** needs the trust toggle enabled.
-- **A Nextcloud address is completed to the `/remote.php/dav/files/USER/` endpoint** rclone's `nextcloud` vendor insists on — a bare server address, the `/remote.php/dav/` interface the StartOS Nextcloud package exports, or `/remote.php/webdav` all become that, while an address already naming `/dav/files/` is kept as pasted.
+- **A Nextcloud address is completed to `/remote.php/dav/files/USER/`**, where Nextcloud serves a user's files over WebDAV — a bare server address, the `/remote.php/dav/` interface the StartOS Nextcloud package exports, or `/remote.php/webdav` all become that, while an address already naming `/dav/files/` is kept as pasted.
 - **What to do next:** run Back Up Now to confirm the target works, then take a StartOS backup — the config is the pointer a restore needs.
 
 ### Back Up Now — Continuous Backups group

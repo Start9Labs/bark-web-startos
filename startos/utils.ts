@@ -44,9 +44,8 @@ export const backupStateSubpath = '.bark/.backup-state.json' // /data/.bark/.bac
 export const backupAgentScript = '/usr/local/bin/backup-agent.sh'
 export const backupFolderDefault = 'bark-backups'
 
-// rclone's nextcloud vendor refuses any address that does not end in
-// /remote.php/dav/files/USER — the form neither Nextcloud's UI nor StartOS's
-// Nextcloud interface shows.
+// Nextcloud serves a user's files over WebDAV at /remote.php/dav/files/USER/,
+// a form neither its UI nor StartOS's Nextcloud interface shows.
 export function nextcloudDavUrl(address: string, user: string): string {
   let url: URL
   try {
