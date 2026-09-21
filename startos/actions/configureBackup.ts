@@ -220,7 +220,7 @@ const WARNING = `<b>⚠ A StartOS backup is what makes these restorable.</b> You
 <b>After saving:</b> run <b>Back Up Now</b> to verify, then take that StartOS backup.<br><br>
 <b>Setup:</b>
 <ul>
-<li><b>SFTP</b>: point at any always-on SSH server (NAS, Raspberry Pi, VPS). Password or SSH key auth. Use a relative folder path (no leading /) to land in the home directory.</li>
+<li><b>SFTP</b>: point at any always-on SSH server (NAS, Raspberry Pi, VPS). Password or SSH key auth. The folder path is relative to the directory an SFTP login starts in — the home directory on most servers, elsewhere on a NAS or a chrooted account; connect with an SFTP client and run <code>pwd</code> to see it. No leading slash.</li>
 <li><b>Nextcloud</b>: create an app password under Settings → Security; the address is the one you open Nextcloud at (its WebDAV address works too). For a LAN server with a self-signed certificate, turn on "Trust self-signed certificate".</li>
 <li><b>Dropbox</b>: create a Scoped/App-folder app, enable files.content.read+write, then supply App Key + App Secret and enable this target. Submit once — you'll get a Dropbox link; approve it and paste the <b>authorization code Dropbox shows you</b> (not a "Generated access token") into the Authorization Code field, then submit again.</li>
 <li><b>Google Drive</b>: create an OAuth Desktop client (Drive API enabled), then supply Client ID + Client Secret and enable this target. Submit once for a Google sign-in link; approve it, then paste the <b>code</b> from the redirected localhost URL (paste it as-is — no need to hand-edit %2F) and submit again.</li>
@@ -381,7 +381,8 @@ const sftpFields = {
           }),
           'sftp-path': sdk.Value.text({
             name: 'Folder Path',
-            description: 'Relative path (no leading /) for the home dir.',
+            description:
+              'Relative to the directory an SFTP login starts in: the home directory on most servers, elsewhere on a NAS or a chrooted account. Connect with an SFTP client and run pwd to see it. No leading slash.',
             default: backupFolderDefault,
             required: false,
           }),
@@ -425,7 +426,8 @@ const sftpFields = {
           }),
           'sftp-path': sdk.Value.text({
             name: 'Folder Path',
-            description: 'Relative path (no leading /) for the home dir.',
+            description:
+              'Relative to the directory an SFTP login starts in: the home directory on most servers, elsewhere on a NAS or a chrooted account. Connect with an SFTP client and run pwd to see it. No leading slash.',
             default: backupFolderDefault,
             required: false,
           }),
