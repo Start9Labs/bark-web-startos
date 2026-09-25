@@ -1,18 +1,18 @@
 import { VersionInfo } from '@start9labs/start-sdk'
 
 export const current = VersionInfo.of({
-  version: '0.9.0:1',
+  version: '0.9.0:2',
   releaseNotes: {
     en_US:
-      'The SFTP target explains which directory its folder path is relative to, and how to find it.',
+      'Back Up Now no longer fails when uploading to a slow external target takes more than 30 seconds.',
     es_ES:
-      'El destino SFTP explica respecto a qué directorio es relativa la ruta de su carpeta, y cómo averiguarlo.',
+      'Back Up Now ya no falla cuando la subida a un destino externo lento tarda más de 30 segundos.',
     de_DE:
-      'Das SFTP-Ziel erklärt, auf welches Verzeichnis sich der Ordnerpfad bezieht und wie man es findet.',
+      'Back Up Now schlägt nicht mehr fehl, wenn das Hochladen zu einem langsamen externen Ziel länger als 30 Sekunden dauert.',
     pl_PL:
-      'Cel SFTP wyjaśnia, względem którego katalogu jest ścieżka folderu i jak go znaleźć.',
+      'Back Up Now nie kończy się już błędem, gdy wysyłanie do wolnego celu zewnętrznego trwa dłużej niż 30 sekund.',
     fr_FR:
-      'La cible SFTP explique par rapport à quel répertoire le chemin de son dossier est relatif, et comment le trouver.',
+      "Back Up Now n'échoue plus lorsque l'envoi vers une cible externe lente prend plus de 30 secondes.",
   },
   migrations: {},
 })

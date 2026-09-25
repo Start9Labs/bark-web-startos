@@ -28,7 +28,8 @@ export const backupNow = sdk.Action.withoutInput(
         readonly: false,
       }),
       'backup-now',
-      async (sub) => sub.exec(['sh', backupAgentScript, '--once']),
+      async (sub) =>
+        sub.exec(['sh', backupAgentScript, '--once'], undefined, null),
     )
 
     if (res.exitCode !== 0) {
