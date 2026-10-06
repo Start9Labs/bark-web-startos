@@ -174,7 +174,7 @@ export const main = sdk.setupMain(async ({ effects }) => {
     })
     .addHealthCheck('backup-status', {
       ready: {
-        display: 'Continuous Backup',
+        display: i18n('Continuous Backup'),
         fn: async () => {
           const cfg = await backupConfigJson
             .read()
@@ -192,8 +192,9 @@ export const main = sdk.setupMain(async ({ effects }) => {
           if (!anyExternal)
             return {
               result: 'failure',
-              message:
+              message: i18n(
                 'No external target. The continuous backup stays on this server only, recoverable only from a StartOS backup you take manually — likely stale when you need it, risking Ark/Lightning funds received or moved since. Add an external target under Actions → Continuous Backups.',
+              ),
             }
           const st = await backupStateJson
             .read()
@@ -205,21 +206,30 @@ export const main = sdk.setupMain(async ({ effects }) => {
             if (st.lastError && age > 1800)
               return {
                 result: 'failure',
-                message: `Backups are failing — last success ${ago(age)} ago: ${st.lastError}`,
+                message: i18n(
+                  'Backups are failing — last success ${age} ago: ${error}',
+                  { age: ago(age), error: st.lastError },
+                ),
               }
-            return { result: 'success', message: `Last backup ${ago(age)} ago` }
+            return {
+              result: 'success',
+              message: i18n('Last backup ${age} ago', { age: ago(age) }),
+            }
           }
           // External configured but nothing shipped yet (no wallet / first
           // backup pending) — healthy idle, not a spinner.
           if (st?.lastError)
             return {
               result: 'failure',
-              message: `Backup has not succeeded yet: ${st.lastError}`,
+              message: i18n('Backup has not succeeded yet: ${error}', {
+                error: st.lastError,
+              }),
             }
           return {
             result: 'success',
-            message:
+            message: i18n(
               'No backup has run yet — backups happen automatically once your wallet has activity.',
+            ),
           }
         },
       },

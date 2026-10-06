@@ -1,6 +1,7 @@
 import * as https from 'https'
 import { URLSearchParams } from 'url'
 import { backupConfigJson } from '../fileModels/backupConfig.json'
+import { i18n } from '../i18n'
 import { sdk } from '../sdk'
 import { backupFolderDefault, nextcloudDavUrl } from '../utils'
 
@@ -17,11 +18,20 @@ import { backupFolderDefault, nextcloudDavUrl } from '../utils'
 // External storage targets. The always-on local backup is handled by the agent,
 // not configured here.
 const VALID_PROVIDERS = ['gdrive', 'dropbox', 'nextcloud', 'sftp'] as const
+const PROVIDER_NAMES = {
+  gdrive: 'Google Drive',
+  dropbox: 'Dropbox',
+  nextcloud: 'Nextcloud',
+  sftp: 'SFTP',
+}
 
 function rejectOnion(addr: string, label: string): void {
   if (addr.includes('.onion'))
     throw new Error(
-      `${label}: .onion (Tor) targets are not supported in this version. Use a clearnet address.`,
+      i18n(
+        '${label}: .onion (Tor) targets are not supported in this version. Use a clearnet address.',
+        { label },
+      ),
     )
 }
 
@@ -38,7 +48,10 @@ function rejectLoopback(addr: string, label: string): void {
     a.includes('0.0.0.0')
   )
     throw new Error(
-      `${label}: that address points at this server itself. A backup stored on this same box won't survive losing it — point at a target on a different machine.`,
+      i18n(
+        "${label}: that address points at this server itself. A backup stored on this same box won't survive losing it — point at a target on a different machine.",
+        { label },
+      ),
     )
 }
 
@@ -101,14 +114,25 @@ function httpsPostJson(
         res.on('end', () => {
           if (res.statusCode !== 200)
             reject(
-              new Error(`${hostname} responded ${res.statusCode}: ${data}`),
+              new Error(
+                i18n('${host} responded ${status}: ${body}', {
+                  host: hostname,
+                  status: String(res.statusCode),
+                  body: data,
+                }),
+              ),
             )
           else
             try {
               resolve(JSON.parse(data))
             } catch {
               reject(
-                new Error(`Could not parse response from ${hostname}: ${data}`),
+                new Error(
+                  i18n('Could not parse response from ${host}: ${body}', {
+                    host: hostname,
+                    body: data,
+                  }),
+                ),
               )
             }
         })
@@ -142,7 +166,9 @@ async function exchangeGoogleCode(
   )
   if (!r.access_token || !r.refresh_token)
     throw new Error(
-      'Google did not return valid tokens. Re-copy the full authorization code.',
+      i18n(
+        'Google did not return valid tokens. Re-copy the full authorization code.',
+      ),
     )
   return JSON.stringify({
     access_token: r.access_token,
@@ -171,7 +197,9 @@ async function exchangeDropboxCode(
   )
   if (!r.refresh_token)
     throw new Error(
-      'Dropbox did not return a refresh token — the code may have expired or already been used. Approve the app in the browser and paste the fresh code it shows.',
+      i18n(
+        'Dropbox did not return a refresh token — the code may have expired or already been used. Approve the app in the browser and paste the fresh code it shows.',
+      ),
     )
   return `{"access_token":"${r.access_token}","token_type":"bearer","refresh_token":"${r.refresh_token}","expiry":"${new Date(Date.now() + r.expires_in * 1000).toISOString()}"}`
 }
@@ -197,7 +225,7 @@ function normalizeKeyPem(keyInput: string): string {
   const end = '-----END OPENSSH PRIVATE KEY-----'
   const norm = keyInput.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim()
   if (!norm.includes(begin) || !norm.includes(end))
-    throw new Error('SFTP: invalid SSH key (missing BEGIN/END markers).')
+    throw new Error(i18n('SFTP: invalid SSH key (missing BEGIN/END markers).'))
   const body = norm
     .substring(norm.indexOf(begin) + begin.length, norm.indexOf(end))
     .replace(/\s+/g, '')
@@ -229,45 +257,49 @@ const WARNING = `<b>⚠ A StartOS backup is what makes these restorable.</b> You
 
 const enabledToggle = () =>
   sdk.Value.toggle({
-    name: 'Enabled',
-    description: 'Keep a continuous backup on this target.',
+    name: i18n('Enabled'),
+    description: i18n(
+      'Off stops backing up to this target but keeps the settings below saved.',
+    ),
     default: false,
   })
 
 // Storage-target field sets (plain records so we can prepend the toggle).
 const gdriveFields = {
   'gdrive-client-id': sdk.Value.text({
-    name: 'OAuth Client ID',
-    description: 'From Google Cloud Console (Drive API, Desktop app).',
+    name: i18n('OAuth Client ID'),
+    description: i18n('From Google Cloud Console (Drive API, Desktop app).'),
     default: '',
     required: false,
   }),
   'gdrive-client-secret': sdk.Value.text({
-    name: 'OAuth Client Secret',
-    description: 'From Google Cloud Console.',
+    name: i18n('OAuth Client Secret'),
+    description: i18n('From Google Cloud Console.'),
     default: '',
     masked: true,
     required: false,
   }),
   'gdrive-auth-code': sdk.Value.text({
-    name: 'Authorization Code (if no Refresh Token)',
-    description:
+    name: i18n('Authorization Code (if no Refresh Token)'),
+    description: i18n(
       'From the Google OAuth redirect (the code= value or the full URL).',
+    ),
     default: '',
     masked: true,
     required: false,
   }),
   'gdrive-refresh-token': sdk.Value.text({
-    name: 'Refresh Token (optional)',
-    description:
+    name: i18n('Refresh Token (optional)'),
+    description: i18n(
       'Paste an existing token, or leave blank to generate one from the Authorization Code.',
+    ),
     default: '',
     masked: true,
     required: false,
   }),
   'gdrive-path': sdk.Value.text({
-    name: 'Folder Path',
-    description: 'Folder name in your Drive root.',
+    name: i18n('Folder Path'),
+    description: i18n('Folder name in your Drive root.'),
     default: backupFolderDefault,
     required: false,
   }),
@@ -275,36 +307,39 @@ const gdriveFields = {
 
 const dropboxFields = {
   'dropbox-client-id': sdk.Value.text({
-    name: 'App Key',
-    description: 'From the Dropbox App Console.',
+    name: i18n('App Key'),
+    description: i18n('From the Dropbox App Console.'),
     default: '',
     required: false,
   }),
   'dropbox-client-secret': sdk.Value.text({
-    name: 'App Secret',
-    description: 'From the Dropbox App Console.',
+    name: i18n('App Secret'),
+    description: i18n('From the Dropbox App Console.'),
     default: '',
     masked: true,
     required: false,
   }),
   'dropbox-auth-code': sdk.Value.text({
-    name: 'Authorization Code (if no Refresh Token)',
-    description: 'From the Dropbox OAuth redirect.',
+    name: i18n('Authorization Code (if no Refresh Token)'),
+    description: i18n(
+      'The code Dropbox shows after you approve the app, not a "Generated access token".',
+    ),
     default: '',
     masked: true,
     required: false,
   }),
   'dropbox-refresh-token': sdk.Value.text({
-    name: 'Refresh Token (optional)',
-    description:
+    name: i18n('Refresh Token (optional)'),
+    description: i18n(
       'Paste an existing token, or leave blank to generate one from the Authorization Code.',
+    ),
     default: '',
     masked: true,
     required: false,
   }),
   'dropbox-path': sdk.Value.text({
-    name: 'Folder Path',
-    description: 'Folder inside your App Folder.',
+    name: i18n('Folder Path'),
+    description: i18n('Folder inside your App Folder.'),
     default: backupFolderDefault,
     required: false,
   }),
@@ -312,34 +347,36 @@ const dropboxFields = {
 
 const nextcloudFields = {
   'nextcloud-url': sdk.Value.text({
-    name: 'Address',
-    description:
+    name: i18n('Address'),
+    description: i18n(
       'The address you open Nextcloud at, such as https://cloud.example.com. Its WebDAV address works too.',
+    ),
     default: '',
     required: false,
   }),
   'nextcloud-user': sdk.Value.text({
-    name: 'Username',
-    description: 'Your Nextcloud login.',
+    name: i18n('Username'),
+    description: null,
     default: '',
     required: false,
   }),
   'nextcloud-pass': sdk.Value.text({
-    name: 'Password',
-    description: 'An app password (Settings → Security).',
+    name: i18n('Password'),
+    description: i18n('An app password (Settings → Security).'),
     default: '',
     masked: true,
     required: false,
   }),
   'nextcloud-insecure-tls': sdk.Value.toggle({
-    name: 'Trust self-signed certificate',
-    description:
+    name: i18n('Trust self-signed certificate'),
+    description: i18n(
       'Skip TLS certificate verification for this server. Turn on ONLY for a Nextcloud on your own LAN using a self-signed or private-CA certificate (e.g. an IP or .local address that fails with "certificate signed by unknown authority"). Your backup is encrypted with your wallet key before upload, so the server only ever receives ciphertext either way.',
+    ),
     default: false,
   }),
   'nextcloud-path': sdk.Value.text({
-    name: 'Folder Path',
-    description: 'Created if missing.',
+    name: i18n('Folder Path'),
+    description: i18n('Created if missing.'),
     default: backupFolderDefault,
     required: false,
   }),
@@ -347,66 +384,70 @@ const nextcloudFields = {
 
 const sftpFields = {
   auth: sdk.Value.union({
-    name: 'Authentication',
-    description: 'Password or SSH key.',
+    name: i18n('Authentication'),
+    description: i18n(
+      '- Password: log in with the account password.\n- SSH Key: log in with an OpenSSH private key that has no passphrase.',
+    ),
     default: 'password',
     variants: sdk.Variants.of({
       password: {
-        name: 'Password',
+        name: i18n('Password'),
         spec: sdk.InputSpec.of({
           'sftp-host': sdk.Value.text({
-            name: 'Host',
-            description: 'Hostname or IP of the SFTP server.',
+            name: i18n('Host'),
+            description: i18n('Hostname or IP of the SFTP server.'),
             default: '',
             required: false,
           }),
           'sftp-user': sdk.Value.text({
-            name: 'Username',
-            description: 'Login username.',
+            name: i18n('Username'),
+            description: null,
             default: '',
             required: false,
           }),
           'sftp-pass': sdk.Value.text({
-            name: 'Password',
-            description: 'Login password.',
+            name: i18n('Password'),
+            description: null,
             default: '',
             masked: true,
             required: false,
           }),
           'sftp-port': sdk.Value.text({
-            name: 'Port',
-            description: 'Default 22.',
+            name: i18n('Port'),
+            description: null,
             default: '22',
             required: false,
           }),
           'sftp-path': sdk.Value.text({
-            name: 'Folder Path',
-            description:
+            name: i18n('Folder Path'),
+            description: i18n(
               'Relative to the directory an SFTP login starts in: the home directory on most servers, elsewhere on a NAS or a chrooted account. Connect with an SFTP client and run pwd to see it. No leading slash.',
+            ),
             default: backupFolderDefault,
             required: false,
           }),
         }),
       },
       key: {
-        name: 'SSH Key',
+        name: i18n('SSH Key'),
         spec: sdk.InputSpec.of({
           'sftp-host': sdk.Value.text({
-            name: 'Host',
-            description: 'Hostname or IP of the SFTP server.',
+            name: i18n('Host'),
+            description: i18n('Hostname or IP of the SFTP server.'),
             default: '',
             required: false,
           }),
           'sftp-user': sdk.Value.text({
-            name: 'Username',
-            description: 'Login username.',
+            name: i18n('Username'),
+            description: null,
             default: '',
             required: false,
           }),
           'sftp-key': sdk.Value.text({
-            name: 'Private Key',
-            description:
-              'Full OpenSSH private key, including the BEGIN/END lines.',
+            name: i18n('Private Key'),
+            description: i18n(
+              'The full OpenSSH private key, including the BEGIN and END lines. A key protected by a passphrase is not supported.',
+            ),
             default: '',
             required: false,
             masked: false,
@@ -414,20 +455,21 @@ const sftpFields = {
               {
                 regex:
                   '^-----BEGIN OPENSSH PRIVATE KEY-----[\\s\\S]*-----END OPENSSH PRIVATE KEY-----\\s*$',
-                description: 'Must be a valid OpenSSH private key',
+                description: i18n('Must be a valid OpenSSH private key'),
               },
             ],
           }),
           'sftp-port': sdk.Value.text({
-            name: 'Port',
-            description: 'Default 22.',
+            name: i18n('Port'),
+            description: null,
             default: '22',
             required: false,
           }),
           'sftp-path': sdk.Value.text({
-            name: 'Folder Path',
-            description:
+            name: i18n('Folder Path'),
+            description: i18n(
               'Relative to the directory an SFTP login starts in: the home directory on most servers, elsewhere on a NAS or a chrooted account. Connect with an SFTP client and run pwd to see it. No leading slash.',
+            ),
             default: backupFolderDefault,
             required: false,
           }),
@@ -441,7 +483,7 @@ const sftpFields = {
 // toggling it off preserves the saved credentials.
 function storageTarget(
   name: string,
-  description: string,
+  description: string | null,
   fields: Record<string, any>,
 ) {
   return sdk.Value.object(
@@ -454,30 +496,33 @@ export const configureBackup = sdk.Action.withInput(
   'configure-backup',
 
   async ({ effects }) => ({
-    name: 'Configure Continuous Backups',
-    description:
+    name: i18n('Configure Continuous Backups'),
+    description: i18n(
       'Add external targets (Drive, Dropbox, Nextcloud, SFTP) for the continuous backup, which always keeps a local copy on this server too. Requires a StartOS backup to be restorable — take one after enabling a target. Toggle a target off to keep its settings. Each wallet gets its own folder inside the one you name, so several wallets can share a target.',
-    warning: WARNING,
+    ),
+    warning: i18n(WARNING),
     allowedStatuses: 'any',
-    group: 'Continuous Backups',
+    group: i18n('Continuous Backups'),
     visibility: 'enabled',
   }),
 
   sdk.InputSpec.of({
     gdrive: storageTarget(
-      'Google Drive',
-      'Back up to Google Drive (free personal accounts work).',
+      PROVIDER_NAMES.gdrive,
+      i18n('Back up to Google Drive (free personal accounts work).'),
       gdriveFields,
     ),
-    dropbox: storageTarget('Dropbox', 'Back up to Dropbox.', dropboxFields),
+    dropbox: storageTarget(PROVIDER_NAMES.dropbox, null, dropboxFields),
     nextcloud: storageTarget(
-      'Nextcloud',
-      'Back up to a Nextcloud instance over WebDAV.',
+      PROVIDER_NAMES.nextcloud,
+      i18n('Back up to a Nextcloud instance over WebDAV.'),
       nextcloudFields,
     ),
     sftp: storageTarget(
-      'SFTP',
-      'Back up to any always-on SSH/SFTP server (NAS, Raspberry Pi, VPS).',
+      PROVIDER_NAMES.sftp,
+      i18n(
+        'Back up to any always-on SSH/SFTP server (NAS, Raspberry Pi, VPS).',
+      ),
       sftpFields,
     ),
   }),
@@ -562,8 +607,8 @@ export const configureBackup = sdk.Action.withInput(
         if (enabled && (!clientId || !clientSecret))
           throw new Error(
             google
-              ? 'Google Drive: Client ID and Client Secret are required.'
-              : 'Dropbox: App Key and App Secret are required.',
+              ? i18n('Google Drive: Client ID and Client Secret are required.')
+              : i18n('Dropbox: App Key and App Secret are required.'),
           )
         // Keep the stored token unless the user supplied a new refresh token or
         // a fresh authorization code (exchanged here, only when enabling).
@@ -576,8 +621,14 @@ export const configureBackup = sdk.Action.withInput(
         if (enabled && !token)
           throw new Error(
             google
-              ? `Google Drive authorization required. Visit:\n${generateGoogleAuthUrl(clientId)}\nthen paste the authorization code or a refresh token and submit again.`
-              : `Dropbox authorization required. Visit:\n${generateDropboxAuthUrl(clientId)}\napprove the app, then paste the authorization code it displays (not a "Generated access token") and submit again.`,
+              ? i18n(
+                  'Google Drive authorization required. Visit:\n${url}\nthen paste the authorization code or a refresh token and submit again.',
+                  { url: generateGoogleAuthUrl(clientId) },
+                )
+              : i18n(
+                  'Dropbox authorization required. Visit:\n${url}\napprove the app, then paste the authorization code it displays (not a "Generated access token") and submit again.',
+                  { url: generateDropboxAuthUrl(clientId) },
+                ),
           )
         patch[provider] = { enabled, clientId, clientSecret, token, path }
       } else if (provider === 'nextcloud') {
@@ -592,7 +643,7 @@ export const configureBackup = sdk.Action.withInput(
           rejectLoopback(url, 'Nextcloud')
           if (!url || !user || !pass)
             throw new Error(
-              'Nextcloud: address, username, and password are required.',
+              i18n('Nextcloud: address, username, and password are required.'),
             )
         }
         if (url) url = nextcloudDavUrl(url, user)
@@ -610,7 +661,7 @@ export const configureBackup = sdk.Action.withInput(
           rejectOnion(host, 'SFTP')
           rejectLoopback(host, 'SFTP')
           if (!host || !user)
-            throw new Error('SFTP: host and username are required.')
+            throw new Error(i18n('SFTP: host and username are required.'))
         }
         let pass: string | null = null
         let keyPem: string | null = null
@@ -623,7 +674,7 @@ export const configureBackup = sdk.Action.withInput(
               ? normalizeKeyPem(keyInput)
               : prev.keyPem || null
           if (enabled && !keyPem)
-            throw new Error('SFTP: a private key is required.')
+            throw new Error(i18n('SFTP: a private key is required.'))
         }
         patch.sftp = { enabled, host, user, port, authType, pass, keyPem, path }
       }
@@ -635,18 +686,20 @@ export const configureBackup = sdk.Action.withInput(
     if (enabledList.length === 0) {
       return {
         version: '1',
-        title: 'No External Target',
-        message:
+        title: i18n('No External Target'),
+        message: i18n(
           'No external target is enabled. The continuous backup still keeps a local copy on this server, but that is recoverable only from a manual StartOS backup and is likely stale when you need it — add an external target, which stays current. Saved target settings were kept.',
+        ),
         result: null,
       }
     }
     return {
       version: '1',
-      title: 'External Target Enabled',
-      message: `Your wallet database will be snapshotted, encrypted with your seed-derived key, and shipped to: ${enabledList.join(
-        ', ',
-      )} (plus the always-on local copy). Run "Back Up Now" to verify, and check the Continuous Backup health check for per-target results.`,
+      title: i18n('External Target Enabled'),
+      message: i18n(
+        'Your wallet database will be snapshotted, encrypted with your seed-derived key, and shipped to: ${targets} (plus the always-on local copy). Run "Back Up Now" to verify, and check the Continuous Backup health check for per-target results.',
+        { targets: enabledList.map((p) => PROVIDER_NAMES[p]).join(', ') },
+      ),
       result: null,
     }
   },
