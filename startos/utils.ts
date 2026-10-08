@@ -1,3 +1,5 @@
+import { i18n } from './i18n'
+
 export const uiPort = 8080
 export const apiPort = 4001
 export const barkdPort = 4000
@@ -51,7 +53,7 @@ export function nextcloudDavUrl(address: string, user: string): string {
   try {
     url = new URL(address)
   } catch {
-    throw new Error('Nextcloud: that is not a valid address.')
+    throw new Error(i18n('Nextcloud: that is not a valid address.'))
   }
   if (!user || /\/dav\/files\/[^/]+/.test(url.pathname)) return address
   const base = url.pathname

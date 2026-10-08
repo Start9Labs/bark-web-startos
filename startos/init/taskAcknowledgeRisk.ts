@@ -1,4 +1,5 @@
 import { acknowledgeRisk } from '../actions/acknowledgeRisk'
+import { i18n } from '../i18n'
 import { sdk } from '../sdk'
 
 // Critical onboarding task, created ONCE on first install: a required, informed
@@ -8,7 +9,8 @@ import { sdk } from '../sdk'
 export const taskAcknowledgeRisk = sdk.setupOnInit(async (effects, kind) => {
   if (kind !== 'install') return
   await sdk.action.createOwnTask(effects, acknowledgeRisk, 'critical', {
-    reason:
+    reason: i18n(
       'Review how your wallet is backed up and acknowledge the risk: restoring a stale backup can permanently lose Ark/Lightning funds received or moved since it was taken. A current external backup and a safeguarded recovery phrase are what protect you.',
+    ),
   })
 })

@@ -1,4 +1,5 @@
 import { configureBackup } from '../actions/configureBackup'
+import { i18n } from '../i18n'
 import { sdk } from '../sdk'
 
 // Important onboarding task, created ONCE on first install: recommend adding an
@@ -8,7 +9,8 @@ import { sdk } from '../sdk'
 export const taskAddBackupTarget = sdk.setupOnInit(async (effects, kind) => {
   if (kind !== 'install') return
   await sdk.action.createOwnTask(effects, configureBackup, 'important', {
-    reason:
+    reason: i18n(
       'Add an external target (Google Drive, Dropbox, Nextcloud, or SFTP) for the continuous backup. The local copy on this server is recoverable only from a manual StartOS backup and is likely stale — an external target stays current.',
+    ),
   })
 })

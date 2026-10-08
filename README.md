@@ -144,6 +144,7 @@ Generates a new random password for the web login and shows it once. Run it when
 
 - **What it changes:** `ui_password` on the volume.
 - **Cost:** the API restarts, and **every existing session is signed out**.
+- **Confirmation:** asked for only when a password already exists, since that one stops working.
 - **Repeat safety:** idempotent in effect, but each run produces a new password and invalidates the old one.
 - **Outputs:** the password, shown once.
 
@@ -174,6 +175,7 @@ A continuous backup is the encrypted wallet snapshot the agent keeps current on 
 Forces an immediate snapshot and upload. Run it to verify a newly configured target.
 
 - **When to run it:** only while the service is running.
+- **Confirmation:** asked for before it runs.
 - **What it changes:** ships a snapshot to every enabled target and updates the backup state.
 - **Repeat safety:** idempotent.
 

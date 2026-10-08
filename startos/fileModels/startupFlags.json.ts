@@ -5,7 +5,7 @@ import { sdk } from '../sdk'
 // setPostRestore and consumed by the `restore-pull` oneshot in main.ts, which
 // pulls + decrypts the latest external snapshot into db.sqlite before barkd
 // opens the database. backup-agent.sh --restore clears it on success.
-export const startupFlagsShape = z.object({
+export const startupFlagsShape = z.looseObject({
   pendingRestore: z.boolean().catch(false),
 })
 

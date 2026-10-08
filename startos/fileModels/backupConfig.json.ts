@@ -27,7 +27,7 @@ import { backupFolderDefault } from '../utils'
 // is the rclone OAuth token JSON (holds the refresh token), minted once by the
 // Configure Continuous Backups action. `riskAccepted` is the user's acknowledgement that
 // funds can be lost without a current external backup and a safeguarded seed.
-const oauthTarget = z.object({
+const oauthTarget = z.looseObject({
   enabled: z.boolean().catch(false),
   clientId: z.string().catch(''),
   clientSecret: z.string().catch(''),
@@ -35,7 +35,7 @@ const oauthTarget = z.object({
   path: z.string().catch(backupFolderDefault),
 })
 
-const nextcloudTarget = z.object({
+const nextcloudTarget = z.looseObject({
   enabled: z.boolean().catch(false),
   url: z.string().catch(''),
   user: z.string().catch(''),
@@ -44,7 +44,7 @@ const nextcloudTarget = z.object({
   path: z.string().catch(backupFolderDefault),
 })
 
-const sftpTarget = z.object({
+const sftpTarget = z.looseObject({
   enabled: z.boolean().catch(false),
   host: z.string().catch(''),
   user: z.string().catch(''),
@@ -55,7 +55,7 @@ const sftpTarget = z.object({
   path: z.string().catch(backupFolderDefault),
 })
 
-export const backupConfigShape = z.object({
+export const backupConfigShape = z.looseObject({
   gdrive: oauthTarget.nullable().catch(null),
   dropbox: oauthTarget.nullable().catch(null),
   nextcloud: nextcloudTarget.nullable().catch(null),
