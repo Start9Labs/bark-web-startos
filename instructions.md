@@ -15,7 +15,7 @@ This package runs Bark on Bitcoin **mainnet**, connected to Second's hosted Ark 
 
 ## Getting set up
 
-1. On first install StartOS prompts you with the **Set UI Password** task. Run it to generate your login password, then note it — you can re-run the task any time to rotate it (which also signs out any existing sessions).
+1. On first install StartOS prompts you with the **Set UI Password** task. Run it to generate your login password, then note it — you can re-run the task any time to rotate it. A rotation asks for confirmation first, since the old password stops working and existing sessions are signed out.
 2. StartOS shows two backup tasks:
    - a **Required** "Backup Safety" task explains how your wallet is backed up and asks you to acknowledge that you can lose funds without a current external backup and a safeguarded recovery phrase. This is required of everyone and clears only once you acknowledge it; and
    - a **Recommended** task suggests adding an external target via **Configure Continuous Backups** (see [Backups](#backups) below), and clears once you do.
