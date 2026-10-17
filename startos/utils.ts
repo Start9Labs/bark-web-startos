@@ -46,6 +46,30 @@ export const backupStateSubpath = '.bark/.backup-state.json' // /data/.bark/.bac
 export const backupAgentScript = '/usr/local/bin/backup-agent.sh'
 export const backupFolderDefault = 'bark-backups'
 
+// backup-agent.sh joins one "<target>: <reason>" per failing target with "; ".
+export const refusedSignins = (error: string | null | undefined) =>
+  (error ?? '')
+    .split('; ')
+    .flatMap((part) =>
+      part.endsWith(': signin') ? [part.slice(0, -': signin'.length)] : [],
+    )
+
+export const describeBackupError = (error: string) =>
+  error
+    .split('; ')
+    .map((part) =>
+      part === 'gdrive: signin'
+        ? i18n(
+            'Google Drive: Google refused the saved sign-in. Sign in again in Configure Continuous Backups. While the Google Cloud app is in Testing, Google ends every sign-in after 7 days; publishing the app stops that.',
+          )
+        : part === 'dropbox: signin'
+          ? i18n(
+              'Dropbox: the saved sign-in was refused. Sign in again in Configure Continuous Backups.',
+            )
+          : part,
+    )
+    .join('; ')
+
 // Nextcloud serves a user's files over WebDAV at /remote.php/dav/files/USER/,
 // a form neither its UI nor StartOS's Nextcloud interface shows.
 export function nextcloudDavUrl(address: string, user: string): string {

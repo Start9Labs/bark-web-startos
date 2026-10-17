@@ -44,13 +44,13 @@ const dict = {
   Enabled: 29,
   'Off stops backing up to this target but keeps the settings below saved.': 30,
   'OAuth Client ID': 31,
-  'From Google Cloud Console (Drive API, Desktop app).': 32,
+  'From Google Cloud Console (Drive API, Desktop app). Publish the app before signing in, or Google ends the sign-in after 7 days. Publishing needs a home page, a privacy policy link and an authorized domain under Branding, and no logo.': 32,
   'OAuth Client Secret': 33,
   'From Google Cloud Console.': 34,
-  'Authorization Code (if no Refresh Token)': 35,
+  'Authorization Code': 35,
   'From the Google OAuth redirect (the code= value or the full URL).': 36,
   'Refresh Token (optional)': 37,
-  'Paste an existing token, or leave blank to generate one from the Authorization Code.': 38,
+  'Shows the saved token. Paste a different one to replace it; a new Authorization Code takes precedence.': 38,
   'Folder Path': 39,
   'Folder name in your Drive root.': 40,
   'App Key': 41,
@@ -78,7 +78,7 @@ const dict = {
   'Must be a valid OpenSSH private key': 63,
   'Configure Continuous Backups': 64,
   'Add external targets (Drive, Dropbox, Nextcloud, SFTP) for the continuous backup, which always keeps a local copy on this server too. Requires a StartOS backup to be restorable — take one after enabling a target. Toggle a target off to keep its settings. Each wallet gets its own folder inside the one you name, so several wallets can share a target.': 65,
-  '<b>⚠ A StartOS backup is what makes these restorable.</b> Your wallet database isn\'t inside it, but your wallet seed and the pointer to these targets are. Set StartOS backups up, and after you enable a target below take a fresh one (System → Create Backup) — one taken earlier won\'t know about this target, so the restore comes back stale.<br><br>\n<b>Add an external, off-box target.</b> A local on-box backup always runs too, but it survives only inside a manual StartOS backup — likely stale. Use a <b>different machine</b> (a NAS, another computer, or a provider). Toggle one off to stop using it while keeping its settings. Tor .onion targets aren\'t supported yet.<br><br>\n<b>After saving:</b> run <b>Back Up Now</b> to verify, then take that StartOS backup.<br><br>\n<b>Setup:</b>\n<ul>\n<li><b>SFTP</b>: point at any always-on SSH server (NAS, Raspberry Pi, VPS). Password or SSH key auth. The folder path is relative to the directory an SFTP login starts in — the home directory on most servers, elsewhere on a NAS or a chrooted account; connect with an SFTP client and run <code>pwd</code> to see it. No leading slash.</li>\n<li><b>Nextcloud</b>: create an app password under Settings → Security; the address is the one you open Nextcloud at (its WebDAV address works too). For a LAN server with a self-signed certificate, turn on "Trust self-signed certificate".</li>\n<li><b>Dropbox</b>: create a Scoped/App-folder app, enable files.content.read+write, then supply App Key + App Secret and enable this target. Submit once — you\'ll get a Dropbox link; approve it and paste the <b>authorization code Dropbox shows you</b> (not a "Generated access token") into the Authorization Code field, then submit again.</li>\n<li><b>Google Drive</b>: create an OAuth Desktop client (Drive API enabled), then supply Client ID + Client Secret and enable this target. Submit once for a Google sign-in link; approve it, then paste the <b>code</b> from the redirected localhost URL (paste it as-is — no need to hand-edit %2F) and submit again.</li>\n<li>Prefer credentials over browser flows? Paste an existing <b>Refresh Token</b> for Google/Dropbox instead of an authorization code.</li>\n</ul>': 66,
+  '<b>⚠ A StartOS backup is what makes these restorable.</b> Your wallet database isn\'t inside it, but your wallet seed and the pointer to these targets are. Set StartOS backups up, and after you enable a target below take a fresh one (System → Create Backup) — one taken earlier won\'t know about this target, so the restore comes back stale.<br><br>\n<b>Add an external, off-box target.</b> A local on-box backup always runs too, but it survives only inside a manual StartOS backup — likely stale. Use a <b>different machine</b> (a NAS, another computer, or a provider). Toggle one off to stop using it while keeping its settings. Tor .onion targets aren\'t supported yet.<br><br>\n<b>After saving:</b> run <b>Back Up Now</b> to verify, then take that StartOS backup.<br><br>\n<b>Setup:</b>\n<ul>\n<li><b>SFTP</b>: point at any always-on SSH server (NAS, Raspberry Pi, VPS). Password or SSH key auth. The folder path is relative to the directory an SFTP login starts in — the home directory on most servers, elsewhere on a NAS or a chrooted account; connect with an SFTP client and run <code>pwd</code> to see it. No leading slash.</li>\n<li><b>Nextcloud</b>: create an app password under Settings → Security; the address is the one you open Nextcloud at (its WebDAV address works too). For a LAN server with a self-signed certificate, turn on "Trust self-signed certificate".</li>\n<li><b>Dropbox</b>: create a Scoped/App-folder app, enable files.content.read+write, then supply App Key + App Secret and enable this target. Submit once — you\'ll get a Dropbox link; approve it and paste the <b>authorization code Dropbox shows you</b> (not a "Generated access token") into the Authorization Code field, then submit again.</li>\n<li><b>Google Drive</b>: create an OAuth Desktop client (Drive API enabled), then supply Client ID + Client Secret and enable this target. Submit once for a Google sign-in link; approve it, then paste the <b>code</b> from the redirected localhost URL (paste it as-is — no need to hand-edit %2F) and submit again. Publish the Google Cloud app first: while it is in Testing, Google ends the sign-in after 7 days. Publishing needs an Application home page, a privacy policy link and an Authorized domain on its Branding page, and no logo.</li>\n<li>Prefer credentials over browser flows? Paste an existing <b>Refresh Token</b> for Google/Dropbox instead of an authorization code.</li>\n</ul>': 66,
   'Back up to Google Drive (free personal accounts work).': 67,
   'Back up to a Nextcloud instance over WebDAV.': 68,
   'Back up to any always-on SSH/SFTP server (NAS, Raspberry Pi, VPS).': 69,
@@ -115,6 +115,14 @@ const dict = {
 
   // utils.ts
   'Nextcloud: that is not a valid address.': 92,
+  'Google Drive: Google refused the saved sign-in. Sign in again in Configure Continuous Backups. While the Google Cloud app is in Testing, Google ends every sign-in after 7 days; publishing the app stops that.': 93,
+  'Dropbox: the saved sign-in was refused. Sign in again in Configure Continuous Backups.': 94,
+  'Google Drive: a new Client ID needs its own Client Secret. Paste the secret from the same client.': 95,
+  'Dropbox: a new App Key needs its own App Secret. Paste the secret from the same app.': 96,
+  'Google rejected this Client ID and Client Secret. Copy both again from the same client in Google Cloud.': 97,
+  'Google will end this sign-in on ${date}, because the Google Cloud app is still in Testing. Sign in here again before then, or publish the app and sign in again: publishing needs a home page, a privacy policy link and an authorized domain under Branding, and no logo.': 98,
+  'Google Drive refused the saved sign-in. Visit:\n${url}\nthen paste the authorization code and submit again.': 99,
+  'Dropbox refused the saved sign-in. Visit:\n${url}\napprove the app, then paste the authorization code it displays and submit again.': 100,
 } as const
 
 /**
