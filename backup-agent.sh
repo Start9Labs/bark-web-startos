@@ -206,7 +206,12 @@ ship() {
       rclone --config "$RCONF" copyto "$WORK/wallet.meta" "${_name}_enc:$META_NAME" $RCLONE_FLAGS $_extra 2>/dev/null \
         || log "[$_name] snapshot shipped but freshness marker failed"
     else
-      _reason=$(echo "$_out" | tail -n 2 | tr '\n' ' ' | sed 's/  */ /g; s/^ *//; s/ *$//')
+      # A refused sign-in (invalid_grant, Drive's authError) becomes "signin"; utils.ts describes it.
+      if printf '%s' "$_out" | grep -Eq 'invalid_grant|Reason: authError'; then
+        _reason=signin
+      else
+        _reason=$(echo "$_out" | tail -n 2 | tr '\n' ' ' | sed 's/  */ /g; s/^ *//; s/ *$//')
+      fi
       printf '%s: %s\n' "$_name" "$_reason" >> "$WORK/failures"
       _all_ok=1
     fi

@@ -164,7 +164,8 @@ A continuous backup is the encrypted wallet snapshot the agent keeps current on 
 - **What it changes:** `backup-config.json`.
 - **Cost:** immediate; available at any status.
 - **Repeat safety:** idempotent. Entries are saved even for targets left disabled, and disabling one keeps its credentials.
-- **Google Drive and Dropbox take two passes** — submit once with app credentials to get a sign-in link, approve it, then paste the returned code back into the form.
+- **Google Drive and Dropbox take two passes** — submit once with app credentials to get a sign-in link, approve it, then paste the returned code back into the form. A fresh code wins over the prefilled refresh token, and a new Client ID or App Key clears the saved token and must come with its own secret.
+- **Google ends the sign-in it gives a Google Cloud app still in Testing after 7 days.** When Google's token response carries `refresh_token_expires_in`, the result gives the date. Publishing the app needs a home page, a privacy policy link and an authorized domain on its Branding page; a logo or more than 10 authorized domains would also need Google's verification. The agent records a refused sign-in (`invalid_grant`, or Drive's `authError`) as `<target>: signin`, which the health check and the next submit both explain, the submit with a fresh sign-in link.
 - **A Nextcloud on the LAN with a self-signed certificate** needs the trust toggle enabled.
 - **An SFTP folder path is resolved against the directory the server starts the login in** — the home directory on a stock OpenSSH server, the top of a share or of the chroot on a NAS or a chrooted account — which rclone reads from the server on connect.
 - **A Nextcloud address is completed to `/remote.php/dav/files/USER/`**, where Nextcloud serves a user's files over WebDAV — a bare server address, the `/remote.php/dav/` interface the StartOS Nextcloud package exports, or `/remote.php/webdav` all become that, while an address already naming `/dav/files/` is kept as pasted.
@@ -210,7 +211,7 @@ Six checks, but only two are shown. The rest pass no display — they exist so a
 
 **"Continuous Backup" reports failure when no external target is configured**, and that is a deliberate judgement rather than a fault. A local backup always runs, but recovering it depends on a manual StartOS backup, so it is likely stale exactly when it is needed — which for an Ark wallet risks funds received or moved since. The check says so in its message and points at the action.
 
-With an external target configured it reports the age of the last successful backup, and turns to failure only when a backup has been failing for more than half an hour. A configured target that has not shipped anything yet reports success with an explanation, rather than sitting on a spinner — a wallet with no activity has nothing to back up.
+With an external target configured it reports the age of the last successful backup, and turns to failure only when a backup has been failing for more than half an hour, or at once when a provider refused the saved sign-in, which never recovers on its own. A configured target that has not shipped anything yet reports success with an explanation, rather than sitting on a spinner — a wallet with no activity has nothing to back up.
 
 A service restarting with no failing check displayed is one of the internal daemons; the service logs name it.
 

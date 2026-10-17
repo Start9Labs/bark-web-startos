@@ -1,9 +1,10 @@
 import * as https from 'https'
 import { URLSearchParams } from 'url'
 import { backupConfigJson } from '../fileModels/backupConfig.json'
+import { backupStateJson } from '../fileModels/backupState.json'
 import { i18n } from '../i18n'
 import { sdk } from '../sdk'
-import { backupFolderDefault, nextcloudDavUrl } from '../utils'
+import { backupFolderDefault, nextcloudDavUrl, refusedSignins } from '../utils'
 
 // Unlike LND's channel.backup (which LND pre-encrypts with the seed), the Bark
 // wallet DB is plaintext, so the backup-agent encrypts each snapshot with a key
@@ -151,7 +152,7 @@ async function exchangeGoogleCode(
   clientId: string,
   clientSecret: string,
   authCodeRaw: string,
-): Promise<string> {
+) {
   const r = await httpsPostJson(
     'oauth2.googleapis.com',
     '/token',
@@ -163,19 +164,33 @@ async function exchangeGoogleCode(
       grant_type: 'authorization_code',
     }).toString(),
     { 'Content-Type': 'application/x-www-form-urlencoded' },
-  )
+  ).catch((e: Error) => {
+    throw /"invalid_client"/.test(e.message)
+      ? new Error(
+          i18n(
+            'Google rejected this Client ID and Client Secret. Copy both again from the same client in Google Cloud.',
+          ),
+        )
+      : e
+  })
   if (!r.access_token || !r.refresh_token)
     throw new Error(
       i18n(
         'Google did not return valid tokens. Re-copy the full authorization code.',
       ),
     )
-  return JSON.stringify({
-    access_token: r.access_token,
-    token_type: r.token_type || 'Bearer',
-    refresh_token: r.refresh_token,
-    expiry: new Date(Date.now() + r.expires_in * 1000).toISOString(),
-  })
+  return {
+    token: JSON.stringify({
+      access_token: r.access_token,
+      token_type: r.token_type || 'Bearer',
+      refresh_token: r.refresh_token,
+      expiry: new Date(Date.now() + r.expires_in * 1000).toISOString(),
+    }),
+    // Google sends this only for a time-limited grant, as an app in Testing gets.
+    signinEnds: r.refresh_token_expires_in
+      ? new Date(Date.now() + r.refresh_token_expires_in * 1000)
+      : null,
+  }
 }
 
 async function exchangeDropboxCode(
@@ -251,7 +266,7 @@ const WARNING = `<b>⚠ A StartOS backup is what makes these restorable.</b> You
 <li><b>SFTP</b>: point at any always-on SSH server (NAS, Raspberry Pi, VPS). Password or SSH key auth. The folder path is relative to the directory an SFTP login starts in — the home directory on most servers, elsewhere on a NAS or a chrooted account; connect with an SFTP client and run <code>pwd</code> to see it. No leading slash.</li>
 <li><b>Nextcloud</b>: create an app password under Settings → Security; the address is the one you open Nextcloud at (its WebDAV address works too). For a LAN server with a self-signed certificate, turn on "Trust self-signed certificate".</li>
 <li><b>Dropbox</b>: create a Scoped/App-folder app, enable files.content.read+write, then supply App Key + App Secret and enable this target. Submit once — you'll get a Dropbox link; approve it and paste the <b>authorization code Dropbox shows you</b> (not a "Generated access token") into the Authorization Code field, then submit again.</li>
-<li><b>Google Drive</b>: create an OAuth Desktop client (Drive API enabled), then supply Client ID + Client Secret and enable this target. Submit once for a Google sign-in link; approve it, then paste the <b>code</b> from the redirected localhost URL (paste it as-is — no need to hand-edit %2F) and submit again.</li>
+<li><b>Google Drive</b>: create an OAuth Desktop client (Drive API enabled), then supply Client ID + Client Secret and enable this target. Submit once for a Google sign-in link; approve it, then paste the <b>code</b> from the redirected localhost URL (paste it as-is — no need to hand-edit %2F) and submit again. Publish the Google Cloud app first: while it is in Testing, Google ends the sign-in after 7 days. Publishing needs an Application home page, a privacy policy link and an Authorized domain on its Branding page, and no logo.</li>
 <li>Prefer credentials over browser flows? Paste an existing <b>Refresh Token</b> for Google/Dropbox instead of an authorization code.</li>
 </ul>`
 
@@ -268,7 +283,9 @@ const enabledToggle = () =>
 const gdriveFields = {
   'gdrive-client-id': sdk.Value.text({
     name: i18n('OAuth Client ID'),
-    description: i18n('From Google Cloud Console (Drive API, Desktop app).'),
+    description: i18n(
+      'From Google Cloud Console (Drive API, Desktop app). Publish the app before signing in, or Google ends the sign-in after 7 days. Publishing needs a home page, a privacy policy link and an authorized domain under Branding, and no logo.',
+    ),
     default: '',
     required: false,
   }),
@@ -280,7 +297,7 @@ const gdriveFields = {
     required: false,
   }),
   'gdrive-auth-code': sdk.Value.text({
-    name: i18n('Authorization Code (if no Refresh Token)'),
+    name: i18n('Authorization Code'),
     description: i18n(
       'From the Google OAuth redirect (the code= value or the full URL).',
     ),
@@ -291,7 +308,7 @@ const gdriveFields = {
   'gdrive-refresh-token': sdk.Value.text({
     name: i18n('Refresh Token (optional)'),
     description: i18n(
-      'Paste an existing token, or leave blank to generate one from the Authorization Code.',
+      'Shows the saved token. Paste a different one to replace it; a new Authorization Code takes precedence.',
     ),
     default: '',
     masked: true,
@@ -320,7 +337,7 @@ const dropboxFields = {
     required: false,
   }),
   'dropbox-auth-code': sdk.Value.text({
-    name: i18n('Authorization Code (if no Refresh Token)'),
+    name: i18n('Authorization Code'),
     description: i18n(
       'The code Dropbox shows after you approve the app, not a "Generated access token".',
     ),
@@ -331,7 +348,7 @@ const dropboxFields = {
   'dropbox-refresh-token': sdk.Value.text({
     name: i18n('Refresh Token (optional)'),
     description: i18n(
-      'Paste an existing token, or leave blank to generate one from the Authorization Code.',
+      'Shows the saved token. Paste a different one to replace it; a new Authorization Code takes precedence.',
     ),
     default: '',
     masked: true,
@@ -588,6 +605,16 @@ export const configureBackup = sdk.Action.withInput(
       .once()
       .catch(() => null)) as any
     const patch: any = {}
+    const refused = refusedSignins(
+      (
+        await backupStateJson
+          .read()
+          .once()
+          .catch(() => null)
+      )?.lastError,
+    )
+    const reauth: string[] = []
+    let signinEndsNote = ''
 
     for (const provider of VALID_PROVIDERS) {
       const o = (input as any)[provider] || {}
@@ -610,14 +637,64 @@ export const configureBackup = sdk.Action.withInput(
               ? i18n('Google Drive: Client ID and Client Secret are required.')
               : i18n('Dropbox: App Key and App Secret are required.'),
           )
-        // Keep the stored token unless the user supplied a new refresh token or
-        // a fresh authorization code (exchanged here, only when enabling).
-        let token: string | null = prev.token || null
-        if (refreshToken) token = tokenFromRefresh(refreshToken, google)
-        else if (enabled && authCodeRaw)
-          token = google
-            ? await exchangeGoogleCode(clientId, clientSecret, authCodeRaw)
-            : await exchangeDropboxCode(clientId, clientSecret, authCodeRaw)
+        if (
+          prev.clientId &&
+          clientId !== prev.clientId &&
+          clientSecret === prev.clientSecret
+        )
+          throw new Error(
+            google
+              ? i18n(
+                  'Google Drive: a new Client ID needs its own Client Secret. Paste the secret from the same client.',
+                )
+              : i18n(
+                  'Dropbox: a new App Key needs its own App Secret. Paste the secret from the same app.',
+                ),
+          )
+        // The form prefills the stored refresh token, so only a different one is new.
+        const clientChanged =
+          clientId !== (prev.clientId || '') ||
+          clientSecret !== (prev.clientSecret || '')
+        const newRefresh =
+          refreshToken && refreshToken !== refreshOf(prev.token)
+            ? refreshToken
+            : ''
+        let token: string | null = clientChanged ? null : prev.token || null
+        if (enabled && authCodeRaw) {
+          if (google) {
+            const exchanged = await exchangeGoogleCode(
+              clientId,
+              clientSecret,
+              authCodeRaw,
+            )
+            token = exchanged.token
+            if (exchanged.signinEnds)
+              signinEndsNote = i18n(
+                'Google will end this sign-in on ${date}, because the Google Cloud app is still in Testing. Sign in here again before then, or publish the app and sign in again: publishing needs a home page, a privacy policy link and an authorized domain under Branding, and no logo.',
+                { date: exchanged.signinEnds.toISOString().slice(0, 10) },
+              )
+          } else {
+            token = await exchangeDropboxCode(
+              clientId,
+              clientSecret,
+              authCodeRaw,
+            )
+          }
+        } else if (newRefresh) {
+          token = tokenFromRefresh(newRefresh, google)
+        } else if (enabled && token && refused.includes(provider)) {
+          reauth.push(
+            google
+              ? i18n(
+                  'Google Drive refused the saved sign-in. Visit:\n${url}\nthen paste the authorization code and submit again.',
+                  { url: generateGoogleAuthUrl(clientId) },
+                )
+              : i18n(
+                  'Dropbox refused the saved sign-in. Visit:\n${url}\napprove the app, then paste the authorization code it displays and submit again.',
+                  { url: generateDropboxAuthUrl(clientId) },
+                ),
+          )
+        }
         if (enabled && !token)
           throw new Error(
             google
@@ -696,10 +773,16 @@ export const configureBackup = sdk.Action.withInput(
     return {
       version: '1',
       title: i18n('External Target Enabled'),
-      message: i18n(
-        'Your wallet database will be snapshotted, encrypted with your seed-derived key, and shipped to: ${targets} (plus the always-on local copy). Run "Back Up Now" to verify, and check the Continuous Backup health check for per-target results.',
-        { targets: enabledList.map((p) => PROVIDER_NAMES[p]).join(', ') },
-      ),
+      message: [
+        ...reauth,
+        signinEndsNote,
+        i18n(
+          'Your wallet database will be snapshotted, encrypted with your seed-derived key, and shipped to: ${targets} (plus the always-on local copy). Run "Back Up Now" to verify, and check the Continuous Backup health check for per-target results.',
+          { targets: enabledList.map((p) => PROVIDER_NAMES[p]).join(', ') },
+        ),
+      ]
+        .filter(Boolean)
+        .join('\n\n'),
       result: null,
     }
   },

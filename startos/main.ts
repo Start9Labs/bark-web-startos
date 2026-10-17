@@ -11,6 +11,8 @@ import {
   barkNetwork,
   capDebugLogScript,
   chainSource,
+  describeBackupError,
+  refusedSignins,
   uiPasswordPath,
   uiSessionSecretPath,
   uiPort,
@@ -203,12 +205,16 @@ export const main = sdk.setupMain(async ({ effects }) => {
           const now = Math.floor(Date.now() / 1000)
           if (st?.lastSuccess) {
             const age = now - st.lastSuccess
-            if (st.lastError && age > 1800)
+            // A refused sign-in never recovers on its own, so it skips the 30-minute grace.
+            if (
+              st.lastError &&
+              (age > 1800 || refusedSignins(st.lastError).length)
+            )
               return {
                 result: 'failure',
                 message: i18n(
                   'Backups are failing — last success ${age} ago: ${error}',
-                  { age: ago(age), error: st.lastError },
+                  { age: ago(age), error: describeBackupError(st.lastError) },
                 ),
               }
             return {
@@ -222,7 +228,7 @@ export const main = sdk.setupMain(async ({ effects }) => {
             return {
               result: 'failure',
               message: i18n('Backup has not succeeded yet: ${error}', {
-                error: st.lastError,
+                error: describeBackupError(st.lastError),
               }),
             }
           return {
