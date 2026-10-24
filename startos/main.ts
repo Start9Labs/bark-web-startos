@@ -73,6 +73,8 @@ export const main = sdk.setupMain(async ({ effects }) => {
           '127.0.0.1',
           '--datadir',
           walletDir,
+          // The embedded UI logs a bearer-token URL at startup.
+          '--no-ui',
           // barkd 0.5.0 made GET /api/v1/wallet/mnemonic opt-in, 404 by
           // default. The wallet's Settings screen is the only place a user can
           // read the phrase after onboarding — a wallet created before

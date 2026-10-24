@@ -2,9 +2,9 @@
 # StartOS. The bark-web frontend and its API proxy are built from the upstream
 # git tag; barkd and rclone are fetched as release binaries with pinned checksums.
 
-ARG BARK_WEB_VERSION=0.9.0
-ARG BARK_VERSION=0.7.1
-ARG RCLONE_VERSION=1.75.1
+ARG BARK_WEB_VERSION=0.10.0
+ARG BARK_VERSION=0.8.0
+ARG RCLONE_VERSION=1.75.2
 
 # ---- Upstream source checkout ----
 FROM docker.io/debian:bookworm-slim AS source
@@ -38,8 +38,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
     && rm -rf /var/lib/apt/lists/*
 ARG BARK_VERSION
 ARG TARGETARCH
-ARG BARKD_SHA256_AMD64=8067b9aab31e250e5580620e3fd0be61f5b778860346d2433b11eae9992db85a
-ARG BARKD_SHA256_ARM64=b9604e1dc4ec409d49ac842aa39dd77e0177f7b3c409a63f255f5b36d2941dd7
+ARG BARKD_SHA256_AMD64=e78bb35dbfb4c9b639a505e12e8cf3c3ab0a730c0fa4d42032b053a7b9db2a14
+ARG BARKD_SHA256_ARM64=3575f6edf0c4091befd12eeff9d5fbb5958c3131e88c62611d6cfd8f9f5b0ebc
 WORKDIR /out
 RUN case "${TARGETARCH}" in \
       amd64) ARCH="x86_64"; SHA="${BARKD_SHA256_AMD64}" ;; \
@@ -57,8 +57,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
     && rm -rf /var/lib/apt/lists/*
 ARG RCLONE_VERSION
 ARG TARGETARCH
-ARG RCLONE_SHA256_AMD64=09c9f7606ed9e31eecc1eec26a89992cf2931a8d2d1a5f0ae2bb1c11630ffb15
-ARG RCLONE_SHA256_ARM64=773f3a76615f91f7d4654183a537afddce3343c8d99ac1d74984f060f2ade2d9
+ARG RCLONE_SHA256_AMD64=efbfe852181f7191eb3c9043ed1ab49c9b2d0ba045c61c926a5da111c939ec5c
+ARG RCLONE_SHA256_ARM64=b8ba161d5c837206fad79ff1aabf0a81aa02a5fb164cdbc0ff5db4160aecd278
 WORKDIR /out
 RUN case "${TARGETARCH}" in \
       amd64) SHA="${RCLONE_SHA256_AMD64}" ;; \
