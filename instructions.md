@@ -4,7 +4,7 @@ This package runs Bark on Bitcoin **mainnet**, connected to Second's hosted Ark 
 
 ## Documentation
 
-- [Bark documentation](https://docs.second.tech) — the upstream guide to the Ark protocol and the Bark wallet.
+- [Bark documentation](https://second.tech/docs) — the upstream guide to the Ark protocol and the Bark wallet.
 
 ## What you get on StartOS
 
