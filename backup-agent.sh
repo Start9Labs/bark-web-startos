@@ -334,6 +334,18 @@ do_backup() (
 
 clear_flag() { echo '{"pendingRestore":false}' > "$FLAGS"; }
 
+# Unknown target availability must not promote an older wallet snapshot.
+hold_restore() {
+  _targets=$1
+  _hostkey=$2
+  log "restore waiting: $_targets could not be consulted (will retry next start)"
+  _msg="Restore is waiting for $_targets, which could not be consulted: another copy could be older and would then overwrite the newer one. Fix the target, or turn it off in Configure Continuous Backups if it is gone for good, then restart the service."
+  # "sftp: hostkey" is the part utils.ts describes and the action re-pins on.
+  [ "$_hostkey" = 0 ] || _msg="$_msg; sftp: hostkey"
+  state_set_str lastError "$_msg"
+  exit 0
+}
+
 # Numeric or 0.
 numor0() { case "$1" in '' | *[!0-9]*) echo 0 ;; *) echo "$1" ;; esac; }
 
@@ -408,12 +420,7 @@ do_restore() {
   done
   if [ -s "$WORK/unreachable" ]; then
     _down=$(paste -sd, "$WORK/unreachable" | sed 's/,/, /g')
-    log "restore waiting: $_down could not be reached (will retry next start)"
-    _msg="Restore is waiting for $_down, which could not be reached: another copy could be older and would then overwrite the newer one. Fix the target, or turn it off in Configure Continuous Backups if it is gone for good, then restart the service."
-    # "sftp: hostkey" is the part utils.ts describes and the action re-pins on.
-    [ "$_hostkey" = 0 ] || _msg="$_msg; sftp: hostkey"
-    state_set_str lastError "$_msg"
-    exit 0
+    hold_restore "$_down" "$_hostkey"
   fi
   if [ ! -s "$WORK/gens" ]; then
     log "no copies found (will retry next start)"; exit 0
@@ -435,8 +442,15 @@ do_restore() {
     _extra=$(tls_flag "$_name")
     # shellcheck disable=SC2086
     _out=$(rclone --config "$RCONF" copyto "${_section}:$ENC_NAME" "$WALLET_DIR/db.sqlite.restored" $RCLONE_FLAGS $_extra 2>&1)
-    if [ $? -ne 0 ]; then
-      log "[$_label] pull/decrypt failed: $(echo "$_out" | tail -n 2 | tr '\n' ' ')"; continue
+    _rc=$?
+    if [ "$_rc" -ne 0 ]; then
+      log "[$_label] pull/decrypt failed: $(echo "$_out" | tail -n 2 | tr '\n' ' ')"
+      rm -f "$WALLET_DIR/db.sqlite.restored"
+      if ! missing_rc "$_rc" && ! crypt_payload_invalid "$_out"; then
+        [ "$(failure_reason "$_out")" != hostkey ] || _hostkey=1
+        hold_restore "$_label" "$_hostkey"
+      fi
+      continue
     fi
     # A target can serve a copy cut to its encryption header: it decrypts to
     # zero bytes, which integrity_check alone accepts. Seed only a wallet.
