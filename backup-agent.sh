@@ -173,6 +173,18 @@ snapshot() {
   [ -s "$SNAP" ] || return 1
 }
 
+# Classify a database file: "wallet" (sound SQLite with the properties row
+# barkd's open_wallet reads), "empty" (missing, zero bytes, or sound with no
+# such row) or "unsound". A zero-byte file passes PRAGMA integrity_check, and
+# barkd's failed open of a missing database leaves a bare schema, so neither
+# check alone tells a wallet apart from nothing.
+wallet_state() {
+  [ -s "$1" ] || { echo empty; return 0; }
+  sqlite3 "$1" "PRAGMA integrity_check" 2>/dev/null | grep -qi '^ok$' || { echo unsound; return 0; }
+  _rows=$(sqlite3 "$1" "SELECT count(*) FROM bark_properties" 2>/dev/null)
+  case "$_rows" in '' | *[!0-9]* | 0) echo empty ;; *) echo wallet ;; esac
+}
+
 # Crude guard: the configure action already rejects .onion targets, so this is
 # only belt-and-suspenders against a hand-edited config.
 remote_is_onion() {
@@ -231,6 +243,14 @@ do_backup() {
     rm -f "$SNAP"
     return 0
   fi
+  # Never replace the targets' copies with a database that holds no wallet —
+  # e.g. the bare schema barkd leaves when a restore found nothing to load.
+  if [ "$(wallet_state "$SNAP")" != wallet ]; then
+    rm -f "$SNAP"
+    log "db.sqlite holds no wallet; not overwriting the backups with it"
+    state_set_str lastError "The wallet database holds no wallet, so it was not backed up over the existing copies."
+    return 1
+  fi
   build_conf || {
     rm -f "$SNAP"
     log "wallet identity could not be derived"
@@ -283,9 +303,17 @@ do_restore() {
     log "no pending restore"; exit 0
   fi
   # Never clobber a wallet that already exists (e.g. user created one after a
-  # prior refusal, or a previous restore already seeded it).
-  if [ -s "$DB" ]; then
-    log "db.sqlite already present; leaving it untouched"; clear_flag; exit 0
+  # prior refusal, or a previous restore already seeded it), nor a database we
+  # cannot read. One with no wallet in it is what barkd leaves when it starts
+  # before a restore succeeds (it creates the schema, then exits on the missing
+  # properties row): discard it, or the pending restore would never retry.
+  case "$(wallet_state "$DB")" in
+    wallet) log "db.sqlite already holds a wallet; leaving it untouched"; clear_flag; exit 0 ;;
+    unsound) log "db.sqlite already present; leaving it untouched"; clear_flag; exit 0 ;;
+  esac
+  if [ -e "$DB" ]; then
+    log "discarding db.sqlite: it holds no wallet"
+    rm -f "$DB" "$DB-wal" "$DB-shm" "$DB-journal"
   fi
   log "restore pending: locating the freshest wallet snapshot"
   if [ ! -f "$MNEMONIC" ]; then log "no mnemonic restored; starting fresh"; clear_flag; exit 0; fi
@@ -312,7 +340,7 @@ do_restore() {
     echo "$_g $_name $_section" >> "$WORK/gens"
   done
   if [ ! -s "$WORK/gens" ]; then
-    log "no reachable targets; barkd will start fresh (will retry next start)"; exit 0
+    log "no reachable targets (will retry next start)"; exit 0
   fi
   sort -rn "$WORK/gens" > "$WORK/gens.sorted"
   _best=$(numor0 "$(head -n1 "$WORK/gens.sorted" | awk '{print $1}')")
@@ -338,18 +366,20 @@ do_restore() {
     if [ $? -ne 0 ]; then
       log "[$_label] pull/decrypt failed: $(echo "$_out" | tail -n 2 | tr '\n' ' ')"; continue
     fi
-    if sqlite3 "$WALLET_DIR/db.sqlite.restored" "PRAGMA integrity_check" 2>/dev/null | grep -qi '^ok$'; then
+    # A target can serve a copy cut to its encryption header: it decrypts to
+    # zero bytes, which integrity_check alone accepts. Seed only a wallet.
+    if [ "$(wallet_state "$WALLET_DIR/db.sqlite.restored")" = wallet ]; then
       mv "$WALLET_DIR/db.sqlite.restored" "$DB"
       printf '{"gen":%s}\n' "$_g" > "$WATERMARK"
       clear_flag
-      log "[$_label] restored db.sqlite from freshest snapshot (gen=$_g)"
+      log "[$_label] restored db.sqlite from snapshot (gen=$_g)"
       exit 0
     fi
-    log "[$_label] integrity check failed on decrypted DB"
+    log "[$_label] decrypted snapshot holds no wallet; trying the next copy"
     rm -f "$WALLET_DIR/db.sqlite.restored"
   done < "$WORK/gens.sorted"
 
-  log "could not restore from any target; barkd will start fresh (will retry next start)"
+  log "could not restore from any target (will retry next start)"
   exit 0
 }
 

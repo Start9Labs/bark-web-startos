@@ -56,3 +56,10 @@ curl -s 'https://gitlab.com/api/v4/projects/ark-bitcoin%2Fbark/repository/compar
    ```
 
    Put the `amd64` hash in `RCLONE_SHA256_AMD64` and the `arm64` hash in `RCLONE_SHA256_ARM64`.
+
+4. Confirm the new `barkd` still opens a wallet from the `bark_properties` table. `wallet_state` in `backup-agent.sh` counts a database as a wallet only by that row, so a rename stops every backup and restore:
+
+   ```sh
+   curl -fsSL "https://gitlab.com/ark-bitcoin/bark/-/raw/bark-<version>/bark/src/persist/sqlite/query.rs" \
+     | grep 'FROM bark_properties'
+   ```
