@@ -213,9 +213,7 @@ export const main = sdk.setupMain(async ({ effects }) => {
             return {
               result: 'failure',
               message: st?.lastError
-                ? i18n('Restore is waiting: ${error}', {
-                    error: describeBackupError(st.lastError),
-                  })
+                ? describeBackupError(st.lastError)
                 : i18n(
                     'Restore is waiting: no wallet snapshot could be loaded yet. Restart the service once a backup target holding one is reachable.',
                   ),

@@ -107,8 +107,7 @@ export default {
     102: 'SFTP: no se pudo leer la clave de host que presentó ${host}. Intenta guardar de nuevo.',
     103: 'El servidor SFTP se identificó como:\n${fingerprint}\nA partir de ahora las copias exigen esta clave. Para comprobarla, compárala con la del propio servidor (ssh-keygen -lf sobre su clave de host). Si la clave cambia, las copias hacia él se detienen hasta que vuelvas a guardar este destino.',
     104: 'SFTP: el servidor presentó una clave de host distinta de la guardada, así que no se le envió nada. Si el servidor se reinstaló o su clave se cambió a propósito, vuelve a guardar el destino SFTP en Configurar copias continuas para aceptar la nueva clave.',
-    105: 'La restauración está en espera: ${error}',
-    106: 'La restauración está en espera: aún no se pudo cargar ninguna copia del monedero. Reinicia el servicio cuando un destino de copia que tenga una sea accesible.',
+    105: 'La restauración está en espera: aún no se pudo cargar ninguna copia del monedero. Reinicia el servicio cuando un destino de copia que tenga una sea accesible.',
   },
   de_DE: {
     0: 'Starte Bark Wallet!',
@@ -216,8 +215,7 @@ export default {
     102: 'SFTP: Der von ${host} gelieferte Host-Schlüssel konnte nicht gelesen werden. Versuche erneut zu speichern.',
     103: 'Der SFTP-Server hat sich ausgewiesen als:\n${fingerprint}\nBackups setzen ab jetzt diesen Schlüssel voraus. Zum Prüfen vergleiche ihn mit dem des Servers selbst (ssh-keygen -lf auf seinen Host-Schlüssel). Ändert sich der Schlüssel, stoppen Backups dorthin, bis du dieses Ziel erneut speicherst.',
     104: 'SFTP: Der Server hat einen anderen Host-Schlüssel als den gespeicherten geliefert, daher wurde nichts gesendet. Wurde der Server neu aufgesetzt oder sein Schlüssel absichtlich geändert, speichere das SFTP-Ziel unter Kontinuierliche Backups konfigurieren erneut, um den neuen Schlüssel zu übernehmen.',
-    105: 'Die Wiederherstellung wartet: ${error}',
-    106: 'Die Wiederherstellung wartet: Es konnte noch keine Wallet-Kopie geladen werden. Starte den Dienst neu, sobald ein Sicherungsziel mit einer Kopie erreichbar ist.',
+    105: 'Die Wiederherstellung wartet: Es konnte noch keine Wallet-Kopie geladen werden. Starte den Dienst neu, sobald ein Sicherungsziel mit einer Kopie erreichbar ist.',
   },
   pl_PL: {
     0: 'Uruchamianie Bark Wallet!',
@@ -325,8 +323,7 @@ export default {
     102: 'SFTP: nie udało się odczytać klucza hosta przedstawionego przez ${host}. Spróbuj zapisać ponownie.',
     103: 'Serwer SFTP przedstawił się jako:\n${fingerprint}\nOd teraz kopie wymagają tego klucza. Aby go sprawdzić, porównaj go z kluczem samego serwera (ssh-keygen -lf na jego kluczu hosta). Jeśli klucz się zmieni, kopie do niego zostaną wstrzymane, dopóki ponownie nie zapiszesz tego celu.',
     104: 'SFTP: serwer przedstawił inny klucz hosta niż zapisany, więc nic do niego nie wysłano. Jeśli serwer przeinstalowano lub jego klucz zmieniono celowo, zapisz ponownie cel SFTP w Konfiguruj ciągłe kopie zapasowe, aby zaakceptować nowy klucz.',
-    105: 'Przywracanie czeka: ${error}',
-    106: 'Przywracanie czeka: nie udało się jeszcze wczytać żadnej kopii portfela. Uruchom ponownie usługę, gdy cel kopii, który ją zawiera, będzie osiągalny.',
+    105: 'Przywracanie czeka: nie udało się jeszcze wczytać żadnej kopii portfela. Uruchom ponownie usługę, gdy cel kopii, który ją zawiera, będzie osiągalny.',
   },
   fr_FR: {
     0: 'Démarrage de Bark Wallet !',
@@ -434,7 +431,6 @@ export default {
     102: "SFTP : la clé d'hôte présentée par ${host} n'a pas pu être lue. Réessayez d'enregistrer.",
     103: "Le serveur SFTP s'est identifié comme :\n${fingerprint}\nLes sauvegardes exigent désormais cette clé. Pour la vérifier, comparez-la à celle du serveur lui-même (ssh-keygen -lf sur sa clé d'hôte). Si la clé change, les sauvegardes vers ce serveur s'arrêtent jusqu'à ce que vous enregistriez à nouveau cette cible.",
     104: "SFTP : le serveur a présenté une clé d'hôte différente de celle enregistrée, rien ne lui a donc été envoyé. Si le serveur a été réinstallé ou sa clé changée volontairement, enregistrez à nouveau la cible SFTP dans Configurer les sauvegardes continues pour accepter la nouvelle clé.",
-    105: 'La restauration est en attente : ${error}',
-    106: "La restauration est en attente : aucune copie du portefeuille n'a encore pu être chargée. Redémarrez le service dès qu'une cible de sauvegarde qui en contient une est joignable.",
+    105: "La restauration est en attente : aucune copie du portefeuille n'a encore pu être chargée. Redémarrez le service dès qu'une cible de sauvegarde qui en contient une est joignable.",
   },
 } satisfies Record<string, LangDict>
