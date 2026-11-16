@@ -212,7 +212,9 @@ Six checks, but only two are shown. The rest pass no display — they exist so a
 
 **"Continuous Backup" reports failure when no external target is configured**, and that is a deliberate judgement rather than a fault. A local backup always runs, but recovering it depends on a manual StartOS backup, so it is likely stale exactly when it is needed — which for an Ark wallet risks funds received or moved since. The check says so in its message and points at the action.
 
-With an external target configured it reports the age of the last successful backup, and turns to failure only when a backup has been failing for more than half an hour, or at once when a provider refused the saved sign-in, which never recovers on its own. A configured target that has not shipped anything yet reports success with an explanation, rather than sitting on a spinner — a wallet with no activity has nothing to back up.
+With an external target configured it reports the age of the last successful backup, and turns to failure only when a backup has been failing for more than half an hour, or at once when a provider refused the saved sign-in or an SFTP server presented a different host key, neither of which recovers on its own. A configured target that has not shipped anything yet reports success with an explanation, rather than sitting on a spinner — a wallet with no activity has nothing to back up.
+
+**While a restore is waiting, "Continuous Backup" says why.** It runs once the restore oneshot finishes, not once the backup agent does: a restore that holds keeps `barkd` (and so the agent) down, and the check is the only place the user sees which target it is waiting for.
 
 A service restarting with no failing check displayed is one of the internal daemons; the service logs name it.
 

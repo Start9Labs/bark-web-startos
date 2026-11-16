@@ -1,5 +1,6 @@
 import { backupConfigJson } from './fileModels/backupConfig.json'
 import { backupStateJson } from './fileModels/backupState.json'
+import { startupFlagsJson } from './fileModels/startupFlags.json'
 import { uiPasswordFile } from './fileModels/uiPassword'
 import { i18n } from './i18n'
 import { sdk } from './sdk'
@@ -12,7 +13,7 @@ import {
   capDebugLogScript,
   chainSource,
   describeBackupError,
-  refusedSignins,
+  needsUser,
   uiPasswordPath,
   uiSessionSecretPath,
   uiPort,
@@ -204,14 +205,25 @@ export const main = sdk.setupMain(async ({ effects }) => {
             .read()
             .once()
             .catch(() => null)
+          const restoring = await startupFlagsJson
+            .read((f) => f.pendingRestore)
+            .once()
+            .catch(() => false)
+          if (restoring)
+            return {
+              result: 'failure',
+              message: st?.lastError
+                ? i18n('Restore is waiting: ${error}', {
+                    error: describeBackupError(st.lastError),
+                  })
+                : i18n(
+                    'Restore is waiting: no wallet snapshot could be loaded yet. Restart the service once a backup target holding one is reachable.',
+                  ),
+            }
           const now = Math.floor(Date.now() / 1000)
           if (st?.lastSuccess) {
             const age = now - st.lastSuccess
-            // A refused sign-in never recovers on its own, so it skips the 30-minute grace.
-            if (
-              st.lastError &&
-              (age > 1800 || refusedSignins(st.lastError).length)
-            )
+            if (st.lastError && (age > 1800 || needsUser(st.lastError)))
               return {
                 result: 'failure',
                 message: i18n(
@@ -241,6 +253,7 @@ export const main = sdk.setupMain(async ({ effects }) => {
           }
         },
       },
-      requires: ['backup-agent'],
+      // Not backup-agent: a waiting restore keeps barkd, and so the agent, down.
+      requires: ['restore-pull'],
     })
 })
