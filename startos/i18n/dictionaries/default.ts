@@ -127,7 +127,6 @@ const dict = {
   'SFTP: the host key ${host} presented could not be read. Try saving again.': 102,
   'The SFTP server identified itself as:\n${fingerprint}\nBackups are held to this key from now on. To check it, compare it with the server’s own (ssh-keygen -lf on its host key). If the key ever changes, backups to it stop until you save this target again.': 103,
   'SFTP: the server presented a different host key than the one saved, so nothing was sent to it. If the server was rebuilt or its key was changed on purpose, save the SFTP target again in Configure Continuous Backups to accept the new key.': 104,
-  '${target}: it holds a newer copy of this wallet than this server has, so it was not overwritten. This wallet may be out of date: another server may be running the same wallet, or this one was restored from an older copy. Stop using it and contact Start9 support.': 105,
 } as const
 
 /**

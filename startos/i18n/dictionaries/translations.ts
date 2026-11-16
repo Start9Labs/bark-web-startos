@@ -107,7 +107,6 @@ export default {
     102: 'SFTP: no se pudo leer la clave de host que presentó ${host}. Intenta guardar de nuevo.',
     103: 'El servidor SFTP se identificó como:\n${fingerprint}\nA partir de ahora las copias exigen esta clave. Para comprobarla, compárala con la del propio servidor (ssh-keygen -lf sobre su clave de host). Si la clave cambia, las copias hacia él se detienen hasta que vuelvas a guardar este destino.',
     104: 'SFTP: el servidor presentó una clave de host distinta de la guardada, así que no se le envió nada. Si el servidor se reinstaló o su clave se cambió a propósito, vuelve a guardar el destino SFTP en Configurar copias continuas para aceptar la nueva clave.',
-    105: '${target}: tiene una copia de este monedero más reciente que la de este servidor, así que no se sobrescribió. Este monedero puede estar desactualizado: otro servidor puede estar usando el mismo monedero, o este se restauró desde una copia más antigua. Deja de usarlo y contacta con el soporte de Start9.',
   },
   de_DE: {
     0: 'Starte Bark Wallet!',
@@ -215,7 +214,6 @@ export default {
     102: 'SFTP: Der von ${host} gelieferte Host-Schlüssel konnte nicht gelesen werden. Versuche erneut zu speichern.',
     103: 'Der SFTP-Server hat sich ausgewiesen als:\n${fingerprint}\nBackups setzen ab jetzt diesen Schlüssel voraus. Zum Prüfen vergleiche ihn mit dem des Servers selbst (ssh-keygen -lf auf seinen Host-Schlüssel). Ändert sich der Schlüssel, stoppen Backups dorthin, bis du dieses Ziel erneut speicherst.',
     104: 'SFTP: Der Server hat einen anderen Host-Schlüssel als den gespeicherten geliefert, daher wurde nichts gesendet. Wurde der Server neu aufgesetzt oder sein Schlüssel absichtlich geändert, speichere das SFTP-Ziel unter Kontinuierliche Backups konfigurieren erneut, um den neuen Schlüssel zu übernehmen.',
-    105: '${target}: Dort liegt eine neuere Kopie dieser Wallet als auf diesem Server, daher wurde sie nicht überschrieben. Diese Wallet ist möglicherweise veraltet: Ein anderer Server betreibt vielleicht dieselbe Wallet, oder dieser wurde aus einer älteren Kopie wiederhergestellt. Benutze sie nicht weiter und wende dich an den Start9-Support.',
   },
   pl_PL: {
     0: 'Uruchamianie Bark Wallet!',
@@ -323,7 +321,6 @@ export default {
     102: 'SFTP: nie udało się odczytać klucza hosta przedstawionego przez ${host}. Spróbuj zapisać ponownie.',
     103: 'Serwer SFTP przedstawił się jako:\n${fingerprint}\nOd teraz kopie wymagają tego klucza. Aby go sprawdzić, porównaj go z kluczem samego serwera (ssh-keygen -lf na jego kluczu hosta). Jeśli klucz się zmieni, kopie do niego zostaną wstrzymane, dopóki ponownie nie zapiszesz tego celu.',
     104: 'SFTP: serwer przedstawił inny klucz hosta niż zapisany, więc nic do niego nie wysłano. Jeśli serwer przeinstalowano lub jego klucz zmieniono celowo, zapisz ponownie cel SFTP w Konfiguruj ciągłe kopie zapasowe, aby zaakceptować nowy klucz.',
-    105: '${target}: przechowuje nowszą kopię tego portfela niż ten serwer, więc nie została nadpisana. Ten portfel może być nieaktualny: inny serwer może używać tego samego portfela albo ten został przywrócony ze starszej kopii. Przestań go używać i skontaktuj się z pomocą Start9.',
   },
   fr_FR: {
     0: 'Démarrage de Bark Wallet !',
@@ -431,6 +428,5 @@ export default {
     102: "SFTP : la clé d'hôte présentée par ${host} n'a pas pu être lue. Réessayez d'enregistrer.",
     103: "Le serveur SFTP s'est identifié comme :\n${fingerprint}\nLes sauvegardes exigent désormais cette clé. Pour la vérifier, comparez-la à celle du serveur lui-même (ssh-keygen -lf sur sa clé d'hôte). Si la clé change, les sauvegardes vers ce serveur s'arrêtent jusqu'à ce que vous enregistriez à nouveau cette cible.",
     104: "SFTP : le serveur a présenté une clé d'hôte différente de celle enregistrée, rien ne lui a donc été envoyé. Si le serveur a été réinstallé ou sa clé changée volontairement, enregistrez à nouveau la cible SFTP dans Configurer les sauvegardes continues pour accepter la nouvelle clé.",
-    105: "${target} : elle contient une copie de ce portefeuille plus récente que celle de ce serveur, elle n'a donc pas été écrasée. Ce portefeuille est peut-être obsolète : un autre serveur utilise peut-être le même portefeuille, ou celui-ci a été restauré depuis une copie plus ancienne. Cessez de l'utiliser et contactez le support Start9.",
   },
 } satisfies Record<string, LangDict>

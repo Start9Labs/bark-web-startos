@@ -70,22 +70,9 @@ export const describeBackupError = (error: string) =>
             ? i18n(
                 'SFTP: the server presented a different host key than the one saved, so nothing was sent to it. If the server was rebuilt or its key was changed on purpose, save the SFTP target again in Configure Continuous Backups to accept the new key.',
               )
-            : part.endsWith(': newer')
-              ? i18n(
-                  '${target}: it holds a newer copy of this wallet than this server has, so it was not overwritten. This wallet may be out of date: another server may be running the same wallet, or this one was restored from an older copy. Stop using it and contact Start9 support.',
-                  { target: targetName(part.slice(0, -': newer'.length)) },
-                )
-              : part,
+            : part,
     )
     .join('; ')
-
-const targetName = (target: string) =>
-  ({
-    gdrive: 'Google Drive',
-    dropbox: 'Dropbox',
-    nextcloud: 'Nextcloud',
-    sftp: 'SFTP',
-  })[target] ?? target
 
 // Nextcloud serves a user's files over WebDAV at /remote.php/dav/files/USER/,
 // a form neither its UI nor StartOS's Nextcloud interface shows.
