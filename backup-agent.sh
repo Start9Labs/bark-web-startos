@@ -235,46 +235,53 @@ remote_is_onion() {
 # de-duplicated summary), or a failing target would flood the log every retry.
 ship() {
   _all_ok=0
+  _unresolved=0
   : > "$WORK/failures"
-  # External writes require every enabled target's marker to be consulted.
-  for _src in $(restore_sources); do
-    _name=${_src%%:*}
-    _section=${_src#*:}
-    [ "$_name" != local ] || continue
-    grep -q "^$_name:" "$WORK/failures" && continue
+  : > "$WORK/cleared"
+  # An external target is written only once its marker clears it: no copy,
+  # one no newer than this lineage, or the copy this lineage last wrote there.
+  # A target that fails the check is skipped and leaves the lineage
+  # unresolved, which keeps baseGen where it is; the other targets still get
+  # the snapshot, stamped with that lineage so a restore can tell it apart.
+  # Folder-root copies predate wallet folders and are never written, so only
+  # each target's wallet folder is consulted.
+  for _name in $(externals); do
     if remote_is_onion "$_name"; then
       printf '%s: .onion targets are not supported in this version\n' "$_name" >> "$WORK/failures"
-      _all_ok=1
+      _all_ok=1; _unresolved=1
       continue
     fi
     _extra=$(tls_flag "$_name")
     rm -f "$WORK/t.json"
     # shellcheck disable=SC2086
-    _out=$(rclone --config "$RCONF" copyto "${_section}:$META_NAME" "$WORK/t.json" $RCLONE_FLAGS $_extra 2>&1)
+    _out=$(rclone --config "$RCONF" copyto "${_name}_enc:$META_NAME" "$WORK/t.json" $RCLONE_FLAGS $_extra 2>&1)
     _rc=$?
     if [ "$_rc" -eq 0 ]; then
       if ! _target_gen=$(marker_gen "$WORK/t.json"); then
         printf '%s: unreadable freshness marker\n' "$_name" >> "$WORK/failures"
-        _all_ok=1
-      elif [ "$_target_gen" -gt "$_base" ]; then
+        _all_ok=1; _unresolved=1
+        continue
+      fi
+      if [ "$_target_gen" -gt "$_base" ] && [ "$_target_gen" != "$(state_get "wrote.$_name")" ]; then
         printf '%s: newer\n' "$_name" >> "$WORK/failures"
-        _all_ok=1
+        _all_ok=1; _unresolved=1
+        continue
       fi
     elif ! missing_rc "$_rc"; then
       printf '%s: %s\n' "$_name" "$(failure_reason "$_out")" >> "$WORK/failures"
-      _all_ok=1
+      _all_ok=1; _unresolved=1
+      continue
     fi
+    echo "$_name" >> "$WORK/cleared"
   done
-  _external_blocked=$_all_ok
-  if [ "$_external_blocked" -ne 0 ]; then
-    # Unverified local copies cannot outrank a newer external lineage on restore.
+  if [ "$_unresolved" -ne 0 ]; then
     if ! sqlite3 "$SNAP" "UPDATE $GEN_TABLE SET base_gen=$_base;" 2>/dev/null; then
       printf 'local: snapshot ancestry could not be recorded\n' >> "$WORK/failures"
       return 1
     fi
+    printf '{"gen":%s,"base":%s}\n' "$_gen" "$_base" > "$WORK/wallet.meta"
   fi
-  for _name in local $(externals); do
-    if [ "$_name" != local ] && [ "$_external_blocked" -ne 0 ]; then continue; fi
+  for _name in local $(cat "$WORK/cleared"); do
     _extra=$(tls_flag "$_name")
     # shellcheck disable=SC2086
     _out=$(rclone --config "$RCONF" copyto "$SNAP" "${_name}_enc:$ENC_NAME" $RCLONE_FLAGS $_extra --log-level NOTICE 2>&1)
@@ -284,12 +291,16 @@ ship() {
       # shellcheck disable=SC2086
       rclone --config "$RCONF" copyto "$WORK/wallet.meta" "${_name}_enc:$META_NAME" $RCLONE_FLAGS $_extra 2>/dev/null \
         || log "[$_name] snapshot shipped but freshness marker failed"
+      [ "$_name" = local ] || [ "$_unresolved" -eq 0 ] || state_merge --arg n "$_name" --argjson v "$_gen" '.wrote[$n] = $v'
     else
       printf '%s: %s\n' "$_name" "$(failure_reason "$_out")" >> "$WORK/failures"
       _all_ok=1
     fi
   done
-  [ "$_external_blocked" -ne 0 ] || state_set_num baseGen "$_gen"
+  if [ "$_unresolved" -eq 0 ]; then
+    state_set_num baseGen "$_gen"
+    state_clear wrote
+  fi
   return $_all_ok
 }
 
@@ -419,6 +430,12 @@ do_restore() {
     elif missing_rc "$_rc"; then
       _g=0 # no marker (pre-marker backup, or marker missing) — freshness unknown
     fi
+    if [ "$_rc" -ne 0 ] && ! missing_rc "$_rc" && [ "$_section" != "${_name}_enc" ] && [ "$_name" != local ]; then
+      # The wallet folder answered for this target; a folder-root copy that
+      # will not decrypt is another wallet's, from before wallets had folders.
+      log "[$_label] holds no copy this wallet can read; skipped"
+      continue
+    fi
     if [ "$_rc" -ne 0 ] && ! missing_rc "$_rc"; then
       if printf '%s' "$_out" | grep -q 'knownhosts: key'; then
         log "[$_label] presented a different host key than the one saved"
@@ -429,7 +446,11 @@ do_restore() {
       grep -qx "$_name" "$WORK/unreachable" || echo "$_name" >> "$WORK/unreachable"
       continue
     fi
-    if [ "$_name" != local ] && [ "$_g" -gt "$_external_gen" ]; then _external_gen=$_g; fi
+    # A copy written while its lineage was unresolved (marker "base") is no
+    # witness: it may itself descend from a stale wallet.
+    if [ "$_name" != local ] && [ "$_g" -gt "$_external_gen" ] && ! jq -e 'has("base")' "$WORK/m.json" >/dev/null 2>&1; then
+      _external_gen=$_g
+    fi
     log "[$_label] available snapshot gen=$_g"
     echo "$_g $_name $_section" >> "$WORK/gens"
   done
@@ -485,7 +506,7 @@ do_restore() {
       fi
       _lineage=$(numor0 "$(sqlite3 "$WALLET_DIR/db.sqlite.restored" "SELECT max(base_gen) FROM $GEN_TABLE" 2>/dev/null)")
       if [ "$_lineage" -gt 0 ] && [ "$_external_gen" -gt "$_lineage" ]; then
-        log "[$_label] local lineage $_lineage predates external gen=$_external_gen; trying the next copy"
+        log "[$_label] built on gen=$_lineage, older than gen=$_external_gen on another target; trying the next copy"
         rm -f "$WALLET_DIR/db.sqlite.restored"
         continue
       fi
@@ -534,6 +555,6 @@ watch_loop() {
 
 case "${1:-}" in
   --once)    mkdir -p "$WORK"; do_backup force ;;
-  --restore) mkdir -p "$WORK"; do_restore ;;
+  --restore) mkdir -p "$WORK"; ( flock -x 9 && do_restore ) 9>/data/backup-agent.lock ;;
   *)         watch_loop ;;
 esac

@@ -25,6 +25,7 @@ export const { createBackup, restoreInit } = sdk.setupBackups(
           '.bark/db.sqlite-shm',
           '.bark/.backup-state.json',
           '.bark/debug.log',
+          'backup-agent.lock',
           'ui_session_secret',
         ],
       })
