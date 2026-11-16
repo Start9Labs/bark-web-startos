@@ -223,21 +223,21 @@ A StartOS backup is point-in-time and stops the service, so it cannot capture a 
 
 So the two halves are split:
 
-- **The backup agent ships the database continuously**, encrypted with a key derived from the seed, to every enabled target — plus, always, to an on-box local copy. It snapshots on change with a periodic backstop. On an external target the snapshot and its freshness marker sit at `<folder>/<wallet id>/`, the wallet id being an HMAC of the mnemonic, so wallets that share an account stay apart and the name tells the target nothing; the local copy stays at `/data/local-backups`.
+- **The backup agent ships the database continuously**, encrypted with a key derived from the seed, to every enabled target — plus, always, to an on-box local copy. It snapshots on change with a periodic backstop. On an external target the snapshot and its freshness marker sit at `<folder>/<wallet id>/`, the wallet id being an HMAC of the mnemonic, so wallets that share an account stay apart and the name tells the target nothing; the local copy stays at `/data/local-backups`. It never ships a database that holds no wallet, so a failed restore cannot overwrite the good copies.
 - **The StartOS backup keeps the small, static remainder**: the seed, the bearer token, the login password, the backup configuration, the freshness watermark, and the local snapshots.
 
 Excluded from the StartOS backup: the database and its journals, the backup status file, `barkd`'s debug log, and the session secret — the last so that a restore regenerates it and forces a clean re-login.
 
-**Restore pulls the newest copy, and refuses a stale one.** The post-restore hook sets a flag; on the next start, a oneshot fetches and decrypts the freshest snapshot from the configured targets — each target's wallet folder and, for copies made before wallets had one, its folder root — and writes the database _before_ `barkd` opens it. If the newest copy it finds is older than the watermark it restored, it **refuses to load it** rather than reverting the wallet — which is what makes a rolled-back backup target survivable. Two independent targets mean a rolled-back one is outvoted.
+**Restore pulls the newest copy, and refuses a stale one.** The post-restore hook sets a flag; on the next start, a oneshot fetches and decrypts the freshest snapshot from the configured targets — each target's wallet folder and, for copies made before wallets had one, its folder root — and writes the database _before_ `barkd` opens it. A copy counts only if it decrypts to sound SQLite holding the `bark_properties` row `barkd` needs to open it, so a target serving an empty or damaged copy is skipped for the next-freshest. A restore that loads nothing stays pending and runs again on the next start, first discarding the bare database `barkd` creates when it starts without one. Every candidate, including a fallback, must meet the restored watermark; an older or undated copy is **refused** rather than reverting the wallet. Undated legacy copies remain eligible only when no watermark was restored. Independent targets can supply a current copy when another is rolled back or damaged.
 
-With no target ever configured, or none reachable, the wallet starts from the seed alone: on-chain funds, plus whatever Ark balance the server can rebuild. Recovery first looks up VTXOs by the wallet's extended public key, then reads the recovery mailbox for anything missed, including completed delegated rounds. It still needs the Ark server and cannot replace a current backup.
+If no usable snapshot can be loaded, `barkd` exits with `failed to read properties` and the web UI cannot start. The mnemonic alone does not trigger automatic seed recovery in this package; restore stays pending for a later start.
 
 **Two things must both be kept**: the recovery phrase, which decrypts every snapshot and cannot be recovered from anything else, and a current StartOS backup, which holds _where_ the snapshots live and the credentials to fetch them.
 
 ## Limitations and Differences
 
 1. **Mainnet only.** The Ark server, chain source, and network are compiled in; signet and regtest are not selectable.
-2. **The wallet database is not in the StartOS backup**, by design. A restore without a reachable target recovers only what the seed can rebuild.
+2. **The wallet database is not in the StartOS backup**, by design. A restore needs a usable wallet snapshot; it does not automatically recover from the seed alone.
 3. **A local-only backup is reported as a failing health check.** It is a floor, not protection — it does not survive losing the server.
 4. **The wallet is created or imported through the web app**, not through a StartOS action, so the recovery phrase is only ever handled in the browser and never passes through a StartOS action result.
 5. **Rotating the login password signs out every session**, unavoidably.
