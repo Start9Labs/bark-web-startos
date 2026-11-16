@@ -89,8 +89,21 @@ restore_sources() {
 # rclone exits 3 or 4 when nothing is at the path; any other failure means the
 # target could not be consulted, which is not evidence it holds no copy.
 missing_rc() { [ "$1" -eq 3 ] || [ "$1" -eq 4 ]; }
-# Gen in a marker file, or 0.
-marker_gen() { numor0 "$(jq -r '.gen // 0' "$1" 2>/dev/null || echo 0)"; }
+# Prints 0 and fails for a missing or invalid marker.
+marker_gen() {
+  _marker=$(numor0 "$(jq -r '.gen // 0' "$1" 2>/dev/null || echo 0)")
+  printf '%s\n' "$_marker"
+  [ "$_marker" -gt 0 ]
+}
+failure_reason() {
+  if printf '%s' "$1" | grep -Eq 'invalid_grant|Reason: authError'; then
+    echo signin
+  elif printf '%s' "$1" | grep -q 'knownhosts: key'; then
+    echo hostkey
+  else
+    printf '%s' "$1" | tail -n 2 | tr '\n' ' ' | sed 's/  */ /g; s/^ *//; s/ *$//'
+  fi
+}
 # A target the user marked as trusting a self-signed cert (LAN Nextcloud, etc.).
 # The snapshot stays encrypted, but anyone in between can read the app password.
 # Echoes the rclone flag to add, or nothing.
@@ -222,29 +235,47 @@ remote_is_onion() {
 # de-duplicated summary), or a failing target would flood the log every retry.
 ship() {
   _all_ok=0
-  _newer=0
   : > "$WORK/failures"
-  for _name in local $(externals); do
+  # External writes require every enabled target's marker to be consulted.
+  for _src in $(restore_sources); do
+    _name=${_src%%:*}
+    _section=${_src#*:}
+    [ "$_name" != local ] || continue
+    grep -q "^$_name:" "$WORK/failures" && continue
     if remote_is_onion "$_name"; then
       printf '%s: .onion targets are not supported in this version\n' "$_name" >> "$WORK/failures"
       _all_ok=1
       continue
     fi
     _extra=$(tls_flag "$_name")
-    # Never overwrite a copy newer than the one this database descends from:
-    # it means this wallet is out of date (a stale restore, or a second server
-    # running the same wallet), and the target holds the only current copy.
-    if [ "$_name" != local ]; then
-      rm -f "$WORK/t.json"
-      # shellcheck disable=SC2086
-      if rclone --config "$RCONF" copyto "${_name}_enc:$META_NAME" "$WORK/t.json" $RCLONE_FLAGS $_extra 2>/dev/null \
-        && [ "$(marker_gen "$WORK/t.json")" -gt "$_base" ]; then
+    rm -f "$WORK/t.json"
+    # shellcheck disable=SC2086
+    _out=$(rclone --config "$RCONF" copyto "${_section}:$META_NAME" "$WORK/t.json" $RCLONE_FLAGS $_extra 2>&1)
+    _rc=$?
+    if [ "$_rc" -eq 0 ]; then
+      if ! _target_gen=$(marker_gen "$WORK/t.json"); then
+        printf '%s: unreadable freshness marker\n' "$_name" >> "$WORK/failures"
+        _all_ok=1
+      elif [ "$_target_gen" -gt "$_base" ]; then
         printf '%s: newer\n' "$_name" >> "$WORK/failures"
         _all_ok=1
-        _newer=1
-        continue
       fi
+    elif ! missing_rc "$_rc"; then
+      printf '%s: %s\n' "$_name" "$(failure_reason "$_out")" >> "$WORK/failures"
+      _all_ok=1
     fi
+  done
+  _external_blocked=$_all_ok
+  if [ "$_external_blocked" -ne 0 ]; then
+    # Unverified local copies cannot outrank a newer external lineage on restore.
+    if ! sqlite3 "$SNAP" "UPDATE $GEN_TABLE SET base_gen=$_base;" 2>/dev/null; then
+      printf 'local: snapshot ancestry could not be recorded\n' >> "$WORK/failures"
+      return 1
+    fi
+  fi
+  for _name in local $(externals); do
+    if [ "$_name" != local ] && [ "$_external_blocked" -ne 0 ]; then continue; fi
+    _extra=$(tls_flag "$_name")
     # shellcheck disable=SC2086
     _out=$(rclone --config "$RCONF" copyto "$SNAP" "${_name}_enc:$ENC_NAME" $RCLONE_FLAGS $_extra --log-level NOTICE 2>&1)
     if [ $? -eq 0 ]; then
@@ -254,26 +285,18 @@ ship() {
       rclone --config "$RCONF" copyto "$WORK/wallet.meta" "${_name}_enc:$META_NAME" $RCLONE_FLAGS $_extra 2>/dev/null \
         || log "[$_name] snapshot shipped but freshness marker failed"
     else
-      # A refused sign-in (invalid_grant, Drive's authError) becomes "signin",
-      # a host key other than the pinned one "hostkey"; utils.ts describes both.
-      if printf '%s' "$_out" | grep -Eq 'invalid_grant|Reason: authError'; then
-        _reason=signin
-      elif printf '%s' "$_out" | grep -q 'knownhosts: key'; then
-        _reason=hostkey
-      else
-        _reason=$(echo "$_out" | tail -n 2 | tr '\n' ' ' | sed 's/  */ /g; s/^ *//; s/ *$//')
-      fi
-      printf '%s: %s\n' "$_name" "$_reason" >> "$WORK/failures"
+      printf '%s: %s\n' "$_name" "$(failure_reason "$_out")" >> "$WORK/failures"
       _all_ok=1
     fi
   done
-  # Advancing past a newer copy would let the next cycle overwrite it.
-  [ "$_newer" = 1 ] || state_set_num baseGen "$_gen"
+  [ "$_external_blocked" -ne 0 ] || state_set_num baseGen "$_gen"
   return $_all_ok
 }
 
 # One backup cycle. Pass "force" to bypass the unchanged-hash skip.
-do_backup() {
+do_backup() (
+  # The watcher and Back Up Now share this lock across subcontainers.
+  flock -x 9 || { log "backup lock failed"; return 1; }
   [ -f "$DB" ] || { log "no db.sqlite yet (wallet not created)"; return 0; }
   [ -f "$MNEMONIC" ] || { log "no mnemonic; cannot derive backup key"; return 0; }
   if ! snapshot; then log "snapshot failed"; state_set_str lastError "snapshot failed"; return 1; fi
@@ -307,7 +330,8 @@ do_backup() {
   # through one is the live original, so it descends from now.
   _base=$(numor0 "$(state_get baseGen)")
   [ "$_base" -gt 0 ] || { _base=$_gen; state_set_num baseGen "$_base"; }
-  if ! sqlite3 "$SNAP" "CREATE TABLE $GEN_TABLE(gen INTEGER NOT NULL); INSERT INTO $GEN_TABLE VALUES($_gen);" 2>/dev/null; then
+  # base_gen records unresolved external ancestry; NULL marks a verified lineage.
+  if ! sqlite3 "$SNAP" "CREATE TABLE $GEN_TABLE(gen INTEGER NOT NULL, base_gen INTEGER); INSERT INTO $GEN_TABLE VALUES($_gen, NULL);" 2>/dev/null; then
     rm -f "$SNAP"; log "snapshot could not be stamped"; state_set_str lastError "snapshot failed"; return 1
   fi
   printf '{"gen":%s}\n' "$_gen" > "$WORK/wallet.meta"
@@ -337,7 +361,7 @@ do_backup() {
     state_set_str lastError "$_err"
   fi
   rm -f "$SNAP"
-}
+) 9>/data/backup-agent.lock
 
 clear_flag() { echo '{"pendingRestore":false}' > "$FLAGS"; }
 
@@ -378,6 +402,7 @@ do_restore() {
   : > "$WORK/gens"
   : > "$WORK/unreachable"
   _hostkey=0
+  _external_gen=0
   for _src in $(restore_sources); do
     _name=${_src%%:*}
     _section=${_src#*:}
@@ -390,19 +415,21 @@ do_restore() {
     _out=$(rclone --config "$RCONF" copyto "${_section}:$META_NAME" "$WORK/m.json" $RCLONE_FLAGS $_extra 2>&1)
     _rc=$?
     if [ "$_rc" -eq 0 ]; then
-      _g=$(marker_gen "$WORK/m.json")
+      _g=$(marker_gen "$WORK/m.json") || _rc=1
     elif missing_rc "$_rc"; then
       _g=0 # no marker (pre-marker backup, or marker missing) — freshness unknown
-    else
+    fi
+    if [ "$_rc" -ne 0 ] && ! missing_rc "$_rc"; then
       if printf '%s' "$_out" | grep -q 'knownhosts: key'; then
         log "[$_label] presented a different host key than the one saved"
         _hostkey=1
       else
-        log "[$_label] could not be reached"
+        log "[$_label] could not be consulted"
       fi
       grep -qx "$_name" "$WORK/unreachable" || echo "$_name" >> "$WORK/unreachable"
       continue
     fi
+    if [ "$_name" != local ] && [ "$_g" -gt "$_external_gen" ]; then _external_gen=$_g; fi
     log "[$_label] available snapshot gen=$_g"
     echo "$_g $_name $_section" >> "$WORK/gens"
   done
@@ -447,6 +474,18 @@ do_restore() {
       if [ "$_own" -eq 0 ] && [ "$_stamped" -lt 2 ]; then _own=$_g; fi
       if [ "$_floor" -gt 0 ] && [ "$_own" -lt "$_floor" ]; then
         log "[$_label] the snapshot itself is from gen=$_own, below required $_floor; trying the next copy"
+        rm -f "$WALLET_DIR/db.sqlite.restored"
+        continue
+      fi
+      # A marker cannot rank a stamped snapshot above its own generation.
+      if [ "$_own" -lt "$_g" ]; then
+        log "[$_label] marker says gen=$_g but the snapshot is older (gen=$_own); trying the next copy"
+        rm -f "$WALLET_DIR/db.sqlite.restored"
+        continue
+      fi
+      _lineage=$(numor0 "$(sqlite3 "$WALLET_DIR/db.sqlite.restored" "SELECT max(base_gen) FROM $GEN_TABLE" 2>/dev/null)")
+      if [ "$_lineage" -gt 0 ] && [ "$_external_gen" -gt "$_lineage" ]; then
+        log "[$_label] local lineage $_lineage predates external gen=$_external_gen; trying the next copy"
         rm -f "$WALLET_DIR/db.sqlite.restored"
         continue
       fi

@@ -83,7 +83,7 @@ FROM docker.io/debian:bookworm-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates nginx \
-      sqlite3 inotify-tools jq openssl openssh-client \
+      sqlite3 inotify-tools jq openssl openssh-client util-linux \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=node-runtime /usr/local/bin/node /usr/local/bin/node
