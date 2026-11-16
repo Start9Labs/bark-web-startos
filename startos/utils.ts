@@ -47,6 +47,11 @@ export const backupAgentScript = '/usr/local/bin/backup-agent.sh'
 export const backupFolderDefault = 'bark-backups'
 
 // backup-agent.sh joins one "<target>: <reason>" per failing target with "; ".
+// A refused sign-in or a changed SFTP host key never clears on its own.
+export const needsUser = (error: string | null | undefined) =>
+  refusedSignins(error).length > 0 ||
+  (error ?? '').split('; ').includes('sftp: hostkey')
+
 export const refusedSignins = (error: string | null | undefined) =>
   (error ?? '')
     .split('; ')

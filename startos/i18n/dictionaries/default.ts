@@ -127,6 +127,8 @@ const dict = {
   'SFTP: the host key ${host} presented could not be read. Try saving again.': 102,
   'The SFTP server identified itself as:\n${fingerprint}\nBackups are held to this key from now on. To check it, compare it with the server’s own (ssh-keygen -lf on its host key). If the key ever changes, backups to it stop until you save this target again.': 103,
   'SFTP: the server presented a different host key than the one saved, so nothing was sent to it. If the server was rebuilt or its key was changed on purpose, save the SFTP target again in Configure Continuous Backups to accept the new key.': 104,
+  'Restore is waiting: ${error}': 105,
+  'Restore is waiting: no wallet snapshot could be loaded yet. Restart the service once a backup target holding one is reachable.': 106,
 } as const
 
 /**
