@@ -64,7 +64,7 @@ const dict = {
   Password: 49,
   'An app password (Settings → Security).': 50,
   'Trust self-signed certificate': 51,
-  'Skip TLS certificate verification for this server. Turn on ONLY for a Nextcloud on your own LAN using a self-signed or private-CA certificate (e.g. an IP or .local address that fails with "certificate signed by unknown authority"). Your backup is encrypted with your wallet key before upload, so the server only ever receives ciphertext either way.': 52,
+  'Skip TLS certificate verification for this server. Turn on ONLY for a Nextcloud on your own LAN using a self-signed or private-CA certificate (e.g. an IP or .local address that fails with "certificate signed by unknown authority"). Your backup stays encrypted with your wallet key, but anyone between this server and Nextcloud could read the app password, which lets them change or delete your backups.': 52,
   'Created if missing.': 53,
   Authentication: 54,
   '- Password: log in with the account password.\n- SSH Key: log in with an OpenSSH private key that has no passphrase.': 55,
@@ -123,6 +123,11 @@ const dict = {
   'Google will end this sign-in on ${date}, because the Google Cloud app is still in Testing. Sign in here again before then, or publish the app and sign in again: publishing needs a home page, a privacy policy link and an authorized domain under Branding, and no logo.': 98,
   'Google Drive refused the saved sign-in. Visit:\n${url}\nthen paste the authorization code and submit again.': 99,
   'Dropbox refused the saved sign-in. Visit:\n${url}\napprove the app, then paste the authorization code it displays and submit again.': 100,
+  'SFTP: ${host} did not answer with a host key. Check the address and port, and that the server is reachable from here.': 101,
+  'SFTP: the host key ${host} presented could not be read. Try saving again.': 102,
+  'The SFTP server identified itself as:\n${fingerprint}\nBackups are held to this key from now on. To check it, compare it with the server’s own (ssh-keygen -lf on its host key). If the key ever changes, backups to it stop until you save this target again.': 103,
+  'SFTP: the server presented a different host key than the one saved, so nothing was sent to it. If the server was rebuilt or its key was changed on purpose, save the SFTP target again in Configure Continuous Backups to accept the new key.': 104,
+  '${target}: it holds a newer copy of this wallet than this server has, so it was not overwritten. This wallet may be out of date: another server may be running the same wallet, or this one was restored from an older copy. Stop using it and contact Start9 support.': 105,
 } as const
 
 /**

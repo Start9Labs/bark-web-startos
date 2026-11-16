@@ -16,6 +16,7 @@
 #
 # Paths below MUST match startos/utils.ts.
 set -u
+umask 077
 
 WALLET_DIR=/data/.bark
 DB="$WALLET_DIR/db.sqlite"
@@ -35,8 +36,12 @@ LOCAL_REMOTE="local:/data/local-backups"
 WORK=/tmp/bark-backup
 SNAP="$WORK/snap.sqlite"
 RCONF="$WORK/rclone.conf"
+KNOWN_HOSTS="$WORK/known_hosts"
 ENC_NAME=wallet.db         # logical object name inside each crypt remote
 META_NAME=wallet.meta      # per-target freshness marker (encrypted alongside)
+# Each snapshot carries its own generation in this table, so a marker swapped
+# onto an older snapshot cannot pass it off as current. Dropped on restore.
+GEN_TABLE=startos_backup_gen
 WALLET_ID=''               # this wallet's folder on every external target
 
 BACKSTOP=300        # seconds; unconditional snapshot cadence (catches silent
@@ -62,28 +67,33 @@ state_clear()   { state_merge "del(.$1)"; }
 state_get() { jq -r ".$1 // empty" "$STATE" 2>/dev/null || true; }
 
 cfg() { jq -r "$1" "$CONFIG" 2>/dev/null; }
-# "provider:path" for each ENABLED external target in the structured config.
-remotes() {
+# Each ENABLED external target's provider name; a folder path may hold spaces,
+# so loops iterate these names and read the path with target_path.
+externals() {
   for _p in gdrive dropbox nextcloud sftp; do
-    [ "$(cfg ".$_p.enabled // false")" = true ] || continue
-    _pp=$(cfg ".$_p.path // empty"); [ -n "$_pp" ] || _pp=bark-backups
-    printf '%s:%s\n' "$_p" "$_pp"
+    [ "$(cfg ".$_p.enabled // false")" = true ] && echo "$_p"
   done
 }
-# All ship targets: the always-on local backup plus any external ones.
-all_targets() { printf '%s\n' "$LOCAL_REMOTE"; remotes; }
+target_path() {
+  _pp=$(cfg ".$1.path // empty"); [ -n "$_pp" ] || _pp=bark-backups
+  printf '%s' "$_pp"
+}
 # "target:crypt section" for every copy restore may read: each external
 # target's own folder and its folder root.
 restore_sources() {
   printf 'local:local_enc\n'
-  for _remote in $(remotes); do
-    _name=$(echo "$_remote" | cut -d: -f1)
+  for _name in $(externals); do
     printf '%s:%s_enc\n%s:%s_legacy\n' "$_name" "$_name" "$_name" "$_name"
   done
 }
+# rclone exits 3 or 4 when nothing is at the path; any other failure means the
+# target could not be consulted, which is not evidence it holds no copy.
+missing_rc() { [ "$1" -eq 3 ] || [ "$1" -eq 4 ]; }
+# Gen in a marker file, or 0.
+marker_gen() { numor0 "$(jq -r '.gen // 0' "$1" 2>/dev/null || echo 0)"; }
 # A target the user marked as trusting a self-signed cert (LAN Nextcloud, etc.).
-# The snapshot is already client-side encrypted, so skipping TLS verification
-# only ever exposes ciphertext. Echoes the rclone flag to add, or nothing.
+# The snapshot stays encrypted, but anyone in between can read the app password.
+# Echoes the rclone flag to add, or nothing.
 tls_flag() { [ "$(cfg ".$1.insecureTls // false")" = true ] && printf '%s' '--no-check-certificate'; }
 
 # ---- key derivation --------------------------------------------------------
@@ -141,9 +151,11 @@ build_conf() {
       "$(cfg '.nextcloud.url // empty')" "$(cfg '.nextcloud.user // empty')" "$(rclone obscure "$(cfg '.nextcloud.pass // empty')")" >> "$RCONF"
   fi
   if [ "$(cfg '.sftp.enabled // false')" = true ]; then
+    pin_sftp_host_key
+    cfg '.sftp.knownHosts // empty' > "$KNOWN_HOSTS"
     {
-      printf '\n[sftp]\ntype = sftp\nhost = %s\nuser = %s\nkey_use_agent = false\nport = %s\nset_modtime = false\n' \
-        "$(cfg '.sftp.host // empty')" "$(cfg '.sftp.user // empty')" "$(cfg '.sftp.port // "22"')"
+      printf '\n[sftp]\ntype = sftp\nhost = %s\nuser = %s\nkey_use_agent = false\nport = %s\nset_modtime = false\nknown_hosts_file = %s\n' \
+        "$(cfg '.sftp.host // empty')" "$(cfg '.sftp.user // empty')" "$(cfg '.sftp.port // "22"')" "$KNOWN_HOSTS"
       if [ "$(cfg '.sftp.authType // "password"')" = key ]; then
         # key_pem is stored rclone-ready: one line with literal \n separators.
         printf 'key_pem = %s\n' "$(cfg '.sftp.keyPem // empty')"
@@ -157,12 +169,22 @@ build_conf() {
   _pw2=$(rclone obscure "$(derive bark-backup-salt-v1)")
   crypt_section local_enc "$LOCAL_REMOTE"
   # <name>_legacy is the root copies landed in before wallets had a folder.
-  for _remote in $(remotes); do
-    _name=$(echo "$_remote" | cut -d: -f1)
-    _path=$(echo "$_remote" | cut -d: -f2-)
+  for _name in $(externals); do
+    _path=$(target_path "$_name")
     crypt_section "${_name}_enc" "${_name}:${_path}/${WALLET_ID}"
     crypt_section "${_name}_legacy" "${_name}:${_path}"
   done
+}
+
+# A target saved before host keys were recorded has none: pin whatever key the
+# server presents now, so every later connection is held to it. An empty
+# known_hosts file makes rclone refuse every key, so a failed scan fails closed.
+pin_sftp_host_key() {
+  [ -z "$(cfg '.sftp.knownHosts // empty')" ] || return 0
+  _keys=$(ssh-keyscan -T 10 -p "$(cfg '.sftp.port // "22"')" "$(cfg '.sftp.host // empty')" 2>/dev/null | grep -v '^#')
+  [ -n "$_keys" ] || return 0
+  jq --arg k "$_keys" '.sftp.knownHosts = $k' "$CONFIG" > "$CONFIG.tmp" && mv "$CONFIG.tmp" "$CONFIG" || rm -f "$CONFIG.tmp"
+  log "[sftp] pinned the server's host key"
 }
 
 snapshot() {
@@ -200,15 +222,29 @@ remote_is_onion() {
 # de-duplicated summary), or a failing target would flood the log every retry.
 ship() {
   _all_ok=0
+  _newer=0
   : > "$WORK/failures"
-  for _remote in $(all_targets); do
-    _name=$(echo "$_remote" | cut -d: -f1)
+  for _name in local $(externals); do
     if remote_is_onion "$_name"; then
       printf '%s: .onion targets are not supported in this version\n' "$_name" >> "$WORK/failures"
       _all_ok=1
       continue
     fi
     _extra=$(tls_flag "$_name")
+    # Never overwrite a copy newer than the one this database descends from:
+    # it means this wallet is out of date (a stale restore, or a second server
+    # running the same wallet), and the target holds the only current copy.
+    if [ "$_name" != local ]; then
+      rm -f "$WORK/t.json"
+      # shellcheck disable=SC2086
+      if rclone --config "$RCONF" copyto "${_name}_enc:$META_NAME" "$WORK/t.json" $RCLONE_FLAGS $_extra 2>/dev/null \
+        && [ "$(marker_gen "$WORK/t.json")" -gt "$_base" ]; then
+        printf '%s: newer\n' "$_name" >> "$WORK/failures"
+        _all_ok=1
+        _newer=1
+        continue
+      fi
+    fi
     # shellcheck disable=SC2086
     _out=$(rclone --config "$RCONF" copyto "$SNAP" "${_name}_enc:$ENC_NAME" $RCLONE_FLAGS $_extra --log-level NOTICE 2>&1)
     if [ $? -eq 0 ]; then
@@ -218,9 +254,12 @@ ship() {
       rclone --config "$RCONF" copyto "$WORK/wallet.meta" "${_name}_enc:$META_NAME" $RCLONE_FLAGS $_extra 2>/dev/null \
         || log "[$_name] snapshot shipped but freshness marker failed"
     else
-      # A refused sign-in (invalid_grant, Drive's authError) becomes "signin"; utils.ts describes it.
+      # A refused sign-in (invalid_grant, Drive's authError) becomes "signin",
+      # a host key other than the pinned one "hostkey"; utils.ts describes both.
       if printf '%s' "$_out" | grep -Eq 'invalid_grant|Reason: authError'; then
         _reason=signin
+      elif printf '%s' "$_out" | grep -q 'knownhosts: key'; then
+        _reason=hostkey
       else
         _reason=$(echo "$_out" | tail -n 2 | tr '\n' ' ' | sed 's/  */ /g; s/^ *//; s/ *$//')
       fi
@@ -228,6 +267,8 @@ ship() {
       _all_ok=1
     fi
   done
+  # Advancing past a newer copy would let the next cycle overwrite it.
+  [ "$_newer" = 1 ] || state_set_num baseGen "$_gen"
   return $_all_ok
 }
 
@@ -236,7 +277,9 @@ do_backup() {
   [ -f "$DB" ] || { log "no db.sqlite yet (wallet not created)"; return 0; }
   [ -f "$MNEMONIC" ] || { log "no mnemonic; cannot derive backup key"; return 0; }
   if ! snapshot; then log "snapshot failed"; state_set_str lastError "snapshot failed"; return 1; fi
-  _hash=$(sha256sum "$SNAP" | awk '{print $1}')
+  # The prefix changes whenever the snapshot format does, so the first cycle
+  # after an upgrade reships every copy in the new format.
+  _hash="v2:$(sha256sum "$SNAP" | awk '{print $1}')"
   if [ "$1" != "force" ] && [ "$_hash" = "$(state_get lastHash)" ]; then
     # Unchanged since the last successful backup — skip silently (barkd touches
     # the DB periodically, so this is the common case; logging it spams).
@@ -260,6 +303,13 @@ do_backup() {
   # Generation = ship time. "Freshest = max gen" lets restore pick the newest
   # target and detect a rolled-back one (target gen < watermark).
   _gen=$(date +%s)
+  # A restore records the generation it loaded; a wallet that never came
+  # through one is the live original, so it descends from now.
+  _base=$(numor0 "$(state_get baseGen)")
+  [ "$_base" -gt 0 ] || { _base=$_gen; state_set_num baseGen "$_base"; }
+  if ! sqlite3 "$SNAP" "CREATE TABLE $GEN_TABLE(gen INTEGER NOT NULL); INSERT INTO $GEN_TABLE VALUES($_gen);" 2>/dev/null; then
+    rm -f "$SNAP"; log "snapshot could not be stamped"; state_set_str lastError "snapshot failed"; return 1
+  fi
   printf '{"gen":%s}\n' "$_gen" > "$WORK/wallet.meta"
   _prev_success=$(state_get lastSuccess)
   _prev_error=$(state_get lastError)
@@ -267,7 +317,8 @@ do_backup() {
     state_set_num lastSuccess "$_gen"
     state_set_str lastHash "$_hash"
     state_clear lastError
-    printf '{"gen":%s}\n' "$_gen" > "$WATERMARK"
+    # v2: every copy at or above this generation carries $GEN_TABLE.
+    printf '{"gen":%s,"v":2}\n' "$_gen" > "$WATERMARK"
     # Log on --once, first success, or recovery from failure only — not every
     # cycle barkd touches the DB, which would flood the log.
     if [ "$1" = force ] || [ -n "$_prev_error" ] || [ -z "$_prev_success" ]; then
@@ -318,10 +369,15 @@ do_restore() {
   log "restore pending: locating the freshest wallet snapshot"
   if [ ! -f "$MNEMONIC" ]; then log "no mnemonic restored; starting fresh"; clear_flag; exit 0; fi
   build_conf || { log "wallet identity could not be derived (will retry next start)"; exit 0; }
-  _floor=$(numor0 "$(jq -r '.gen // 0' "$WATERMARK" 2>/dev/null || echo 0)")
+  _floor=$(marker_gen "$WATERMARK")
+  _stamped=$(numor0 "$(jq -r '.v // 1' "$WATERMARK" 2>/dev/null || echo 1)")
 
-  # Collect "<gen> <target> <section>" for every reachable copy.
+  # Collect "<gen> <target> <section>" for every copy, and every target that
+  # could not be consulted: its copy may be the newest, so any other would be
+  # a guess that can load an older wallet and then overwrite the newer one.
   : > "$WORK/gens"
+  : > "$WORK/unreachable"
+  _hostkey=0
   for _src in $(restore_sources); do
     _name=${_src%%:*}
     _section=${_src#*:}
@@ -331,16 +387,36 @@ do_restore() {
     rm -f "$WORK/m.json"
     _extra=$(tls_flag "$_name")
     # shellcheck disable=SC2086
-    if rclone --config "$RCONF" copyto "${_section}:$META_NAME" "$WORK/m.json" $RCLONE_FLAGS $_extra 2>/dev/null; then
-      _g=$(numor0 "$(jq -r '.gen // 0' "$WORK/m.json" 2>/dev/null || echo 0)")
-    else
+    _out=$(rclone --config "$RCONF" copyto "${_section}:$META_NAME" "$WORK/m.json" $RCLONE_FLAGS $_extra 2>&1)
+    _rc=$?
+    if [ "$_rc" -eq 0 ]; then
+      _g=$(marker_gen "$WORK/m.json")
+    elif missing_rc "$_rc"; then
       _g=0 # no marker (pre-marker backup, or marker missing) — freshness unknown
+    else
+      if printf '%s' "$_out" | grep -q 'knownhosts: key'; then
+        log "[$_label] presented a different host key than the one saved"
+        _hostkey=1
+      else
+        log "[$_label] could not be reached"
+      fi
+      grep -qx "$_name" "$WORK/unreachable" || echo "$_name" >> "$WORK/unreachable"
+      continue
     fi
     log "[$_label] available snapshot gen=$_g"
     echo "$_g $_name $_section" >> "$WORK/gens"
   done
+  if [ -s "$WORK/unreachable" ]; then
+    _down=$(paste -sd, "$WORK/unreachable" | sed 's/,/, /g')
+    log "restore waiting: $_down could not be reached (will retry next start)"
+    _msg="Restore is waiting for $_down, which could not be reached: another copy could be older and would then overwrite the newer one. Fix the target, or turn it off in Configure Continuous Backups if it is gone for good, then restart the service."
+    # "sftp: hostkey" is the part utils.ts describes and the action re-pins on.
+    [ "$_hostkey" = 0 ] || _msg="$_msg; sftp: hostkey"
+    state_set_str lastError "$_msg"
+    exit 0
+  fi
   if [ ! -s "$WORK/gens" ]; then
-    log "no reachable targets (will retry next start)"; exit 0
+    log "no copies found (will retry next start)"; exit 0
   fi
   sort -rn "$WORK/gens" > "$WORK/gens.sorted"
 
@@ -365,10 +441,26 @@ do_restore() {
     # A target can serve a copy cut to its encryption header: it decrypts to
     # zero bytes, which integrity_check alone accepts. Seed only a wallet.
     if [ "$(wallet_state "$WALLET_DIR/db.sqlite.restored")" = wallet ]; then
+      # The marker only ranked the copy; its own stamp says how current it is.
+      # A watermark at v2 or later means every current copy is stamped.
+      _own=$(numor0 "$(sqlite3 "$WALLET_DIR/db.sqlite.restored" "SELECT max(gen) FROM $GEN_TABLE" 2>/dev/null)")
+      if [ "$_own" -eq 0 ] && [ "$_stamped" -lt 2 ]; then _own=$_g; fi
+      if [ "$_floor" -gt 0 ] && [ "$_own" -lt "$_floor" ]; then
+        log "[$_label] the snapshot itself is from gen=$_own, below required $_floor; trying the next copy"
+        rm -f "$WALLET_DIR/db.sqlite.restored"
+        continue
+      fi
+      [ "$_own" = "$_g" ] || log "[$_label] marker says gen=$_g, the snapshot itself gen=$_own"
+      if ! sqlite3 "$WALLET_DIR/db.sqlite.restored" "DROP TABLE IF EXISTS $GEN_TABLE" 2>/dev/null; then
+        log "[$_label] could not prepare the snapshot; trying the next copy"
+        rm -f "$WALLET_DIR/db.sqlite.restored"
+        continue
+      fi
       mv "$WALLET_DIR/db.sqlite.restored" "$DB"
-      printf '{"gen":%s}\n' "$_g" > "$WATERMARK"
+      printf '{"gen":%s,"v":%s}\n' "$_own" "$_stamped" > "$WATERMARK"
+      state_set_num baseGen "$_own"
       clear_flag
-      log "[$_label] restored db.sqlite from snapshot (gen=$_g)"
+      log "[$_label] restored db.sqlite from snapshot (gen=$_own)"
       exit 0
     fi
     log "[$_label] decrypted snapshot holds no wallet; trying the next copy"

@@ -53,6 +53,9 @@ const sftpTarget = z.looseObject({
   pass: z.string().nullable().catch(null),
   keyPem: z.string().nullable().catch(null),
   path: z.string().catch(backupFolderDefault),
+  // ssh-keyscan lines rclone holds the server to. Empty until the target is
+  // saved or the agent first connects, which pins whatever key it is shown.
+  knownHosts: z.string().catch(''),
 })
 
 export const backupConfigShape = z.looseObject({

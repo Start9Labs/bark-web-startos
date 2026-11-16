@@ -134,7 +134,7 @@ export const main = sdk.setupMain(async ({ effects }) => {
       subcontainer: sdk.SubContainer.of(
         effects,
         { imageId: 'bark' },
-        mounts,
+        null,
         'nginx-sub',
       ),
       exec: { command: ['nginx', '-g', 'daemon off;'] },

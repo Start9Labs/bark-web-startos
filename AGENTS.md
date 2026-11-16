@@ -38,4 +38,6 @@ verified, tried, and decided belongs in the commit message and the PR body.
 - **Keep `--expose-mnemonic` on barkd's command** — without it the wallet's Settings screen can't reveal the recovery phrase.
 - **Keep login in the API and backup credentials verbatim in `backup-config.json`** — don't add a reverse-proxy credential or `rclone obscure` them on the TypeScript side; the agent obscures them when it writes `rclone.conf`.
 - **Gate restore and backup on `wallet_state`, not on `PRAGMA integrity_check` or a non-empty file** — a copy cut to its 32-byte crypt header decrypts to zero bytes that pass integrity_check, and barkd's failed open leaves a non-empty schema with no wallet in it.
+- **In `do_restore`, only rclone exit 3 or 4 means a target holds no copy** — treat any other failure as unreachable and hold the restore; falling back loads an older wallet, which the next cycle then ships over the newer copy.
+- **Change the `lastHash` prefix in `do_backup` whenever the snapshot format changes** — an idle wallet otherwise never reships, and its targets keep copies in the old format.
 - **`backup-agent.sh` hardcodes the absolute paths `utils.ts` declares, and editing it doesn't trigger a local rebuild** — change both together, and `touch bark.Dockerfile` before `make` to pick up the script.
