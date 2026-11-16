@@ -1,3 +1,4 @@
+import { T } from '@start9labs/start-sdk'
 import * as https from 'https'
 import { URLSearchParams } from 'url'
 import { backupConfigJson } from '../fileModels/backupConfig.json'
@@ -258,6 +259,63 @@ function refreshOf(tok?: string | null): string {
   }
 }
 
+// The host keys an SFTP server presents, as known_hosts lines, and their fingerprints.
+async function scanHostKeys(
+  effects: T.Effects,
+  host: string,
+  port: string,
+): Promise<{ knownHosts: string; fingerprints: string }> {
+  return sdk.SubContainer.withTemp(
+    effects,
+    { imageId: 'bark' },
+    null,
+    'sftp-keyscan',
+    async (sub) => {
+      const scan = await sub.exec(
+        ['ssh-keyscan', '-T', '10', '-p', port, host],
+        { timeout: 40_000 },
+      )
+      // Only whole key lines from a scan that finished: a cut-off run leaves
+      // partial lines that ssh-keygen and rclone reject, or none at all.
+      const lines = String(scan.stdout)
+        .split('\n')
+        .filter((l) => l && !l.startsWith('#'))
+      if (!lines.length)
+        throw new Error(
+          i18n(
+            'SFTP: ${host} did not answer with a host key. Check the address and port, and that the server is reachable from here.',
+            { host: `${host}:${port}` },
+          ),
+        )
+      const unreadable = new Error(
+        i18n(
+          'SFTP: the host key ${host} presented could not be read. Try saving again.',
+          { host: `${host}:${port}` },
+        ),
+      )
+      if (
+        scan.exitCode !== 0 ||
+        !lines.every((l) =>
+          /^\S+ (ssh-(rsa|ed25519|dss)|ecdsa-sha2-nistp(256|384|521)|sk-\S+) [A-Za-z0-9+/]+={0,2}$/.test(
+            l,
+          ),
+        )
+      )
+        throw unreadable
+      const knownHosts = lines.join('\n')
+      const fp = await sub.exec(['ssh-keygen', '-lf', '-'], {
+        input: knownHosts + '\n',
+      })
+      const fingerprints = String(fp.stdout)
+        .split('\n')
+        .filter((l) => l.trim())
+      if (fp.exitCode !== 0 || fingerprints.length !== lines.length)
+        throw unreadable
+      return { knownHosts, fingerprints: fingerprints.join('\n') }
+    },
+  )
+}
+
 const WARNING = `<b>⚠ A StartOS backup is what makes these restorable.</b> Your wallet database isn't inside it, but your wallet seed and the pointer to these targets are. Set StartOS backups up, and after you enable a target below take a fresh one (System → Create Backup) — one taken earlier won't know about this target, so the restore comes back stale.<br><br>
 <b>Add an external, off-box target.</b> A local on-box backup always runs too, but it survives only inside a manual StartOS backup — likely stale. Use a <b>different machine</b> (a NAS, another computer, or a provider). Toggle one off to stop using it while keeping its settings. Tor .onion targets aren't supported yet.<br><br>
 <b>After saving:</b> run <b>Back Up Now</b> to verify, then take that StartOS backup.<br><br>
@@ -387,7 +445,7 @@ const nextcloudFields = {
   'nextcloud-insecure-tls': sdk.Value.toggle({
     name: i18n('Trust self-signed certificate'),
     description: i18n(
-      'Skip TLS certificate verification for this server. Turn on ONLY for a Nextcloud on your own LAN using a self-signed or private-CA certificate (e.g. an IP or .local address that fails with "certificate signed by unknown authority"). Your backup is encrypted with your wallet key before upload, so the server only ever receives ciphertext either way.',
+      'Skip TLS certificate verification for this server. Turn on ONLY for a Nextcloud on your own LAN using a self-signed or private-CA certificate (e.g. an IP or .local address that fails with "certificate signed by unknown authority"). Your backup stays encrypted with your wallet key, but anyone between this server and Nextcloud could read the app password, which lets them change or delete your backups.',
     ),
     default: false,
   }),
@@ -605,16 +663,16 @@ export const configureBackup = sdk.Action.withInput(
       .once()
       .catch(() => null)) as any
     const patch: any = {}
-    const refused = refusedSignins(
-      (
-        await backupStateJson
-          .read()
-          .once()
-          .catch(() => null)
-      )?.lastError,
-    )
+    const lastError = (
+      await backupStateJson
+        .read()
+        .once()
+        .catch(() => null)
+    )?.lastError
+    const refused = refusedSignins(lastError)
     const reauth: string[] = []
     let signinEndsNote = ''
+    let hostKeyNote = ''
 
     for (const provider of VALID_PROVIDERS) {
       const o = (input as any)[provider] || {}
@@ -753,7 +811,33 @@ export const configureBackup = sdk.Action.withInput(
           if (enabled && !keyPem)
             throw new Error(i18n('SFTP: a private key is required.'))
         }
-        patch.sftp = { enabled, host, user, port, authType, pass, keyPem, path }
+        // Keep the pinned key unless the server changed, or its key stopped
+        // matching and the user is saving again to accept the new one.
+        let knownHosts =
+          host === prev.host &&
+          port === (prev.port || '22') &&
+          !(lastError ?? '').split('; ').includes('sftp: hostkey')
+            ? prev.knownHosts || ''
+            : ''
+        if (enabled && !knownHosts) {
+          const scan = await scanHostKeys(effects, host, port)
+          knownHosts = scan.knownHosts
+          hostKeyNote = i18n(
+            'The SFTP server identified itself as:\n${fingerprint}\nBackups are held to this key from now on. To check it, compare it with the server’s own (ssh-keygen -lf on its host key). If the key ever changes, backups to it stop until you save this target again.',
+            { fingerprint: scan.fingerprints },
+          )
+        }
+        patch.sftp = {
+          enabled,
+          host,
+          user,
+          port,
+          authType,
+          pass,
+          keyPem,
+          path,
+          knownHosts,
+        }
       }
     }
 
@@ -776,6 +860,7 @@ export const configureBackup = sdk.Action.withInput(
       message: [
         ...reauth,
         signinEndsNote,
+        hostKeyNote,
         i18n(
           'Your wallet database will be snapshotted, encrypted with your seed-derived key, and shipped to: ${targets} (plus the always-on local copy). Run "Back Up Now" to verify, and check the Continuous Backup health check for per-target results.',
           { targets: enabledList.map((p) => PROVIDER_NAMES[p]).join(', ') },

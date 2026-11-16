@@ -3,6 +3,7 @@
 # git tag; barkd and rclone are fetched as release binaries with pinned checksums.
 
 ARG BARK_WEB_VERSION=0.11.0
+ARG BARK_WEB_COMMIT=d058a8df0b001aa2d4672028e8d67f8bf6c95695
 ARG BARK_VERSION=0.8.1
 ARG RCLONE_VERSION=1.76.0
 
@@ -11,8 +12,11 @@ FROM docker.io/debian:bookworm-slim AS source
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates git \
     && rm -rf /var/lib/apt/lists/*
 ARG BARK_WEB_VERSION
+ARG BARK_WEB_COMMIT
+# A tag can be moved; the build fails unless it still names the reviewed commit.
 RUN git clone --depth 1 --branch v${BARK_WEB_VERSION} \
-      https://gitlab.com/ark-bitcoin/bark-web.git /src
+      https://gitlab.com/ark-bitcoin/bark-web.git /src \
+    && test "$(git -C /src rev-parse HEAD)" = "${BARK_WEB_COMMIT}"
 
 # ---- SPA build ----
 FROM docker.io/node:22-alpine AS spa-builder
@@ -71,15 +75,18 @@ RUN case "${TARGETARCH}" in \
     dpkg-deb -x rclone.deb extract && \
     install -m 0755 extract/usr/bin/rclone rclone
 
+# ---- Node runtime (glibc build, for the Debian final image) ----
+FROM docker.io/node:22-bookworm-slim AS node-runtime
+
 # ---- Final runtime ----
 FROM docker.io/debian:bookworm-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      ca-certificates curl nginx \
-      sqlite3 inotify-tools jq openssl \
-    && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
-    && apt-get install -y --no-install-recommends nodejs \
+      ca-certificates nginx \
+      sqlite3 inotify-tools jq openssl openssh-client util-linux \
     && rm -rf /var/lib/apt/lists/*
+
+COPY --from=node-runtime /usr/local/bin/node /usr/local/bin/node
 
 RUN mkdir -p /app/web /app/api /data
 

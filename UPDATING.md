@@ -2,7 +2,7 @@
 
 This package pins three upstream artifacts in `bark.Dockerfile`:
 
-- **`bark-web`** — the frontend GUI and its API proxy, built from a git tag (`BARK_WEB_VERSION`).
+- **`bark-web`** — the frontend GUI and its API proxy, built from a git tag (`BARK_WEB_VERSION`) checked against its commit (`BARK_WEB_COMMIT`).
 - **`barkd`** — the wallet daemon, fetched as a release binary with a pinned SHA-256 (`BARK_VERSION`).
 - **`rclone`** — the backup agent's transfer tool, fetched as a release `.deb` with a pinned SHA-256 (`RCLONE_VERSION`). It moves on its own cadence, independent of the two above.
 
@@ -39,7 +39,13 @@ curl -s 'https://gitlab.com/api/v4/projects/ark-bitcoin%2Fbark/repository/compar
 
 ## Applying the bump
 
-1. In `bark.Dockerfile`, update the `ARG BARK_WEB_VERSION` and `ARG BARK_VERSION` defaults.
+1. In `bark.Dockerfile`, update the `ARG BARK_WEB_VERSION` and `ARG BARK_VERSION` defaults, and set `ARG BARK_WEB_COMMIT` to the commit the new tag names (the build fails if they disagree):
+
+   ```sh
+   git ls-remote https://gitlab.com/ark-bitcoin/bark-web.git 'refs/tags/v<version>*'
+   ```
+
+   For an annotated tag, use the `^{}` line: that is the commit.
 2. Refresh the pinned daemon checksums from the release `SHA256SUMS`:
 
    ```sh

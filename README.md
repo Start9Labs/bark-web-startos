@@ -47,10 +47,10 @@ One image, built here, running five daemons that StartOS supervises independentl
 | ------------------ | ------------- | ------------- | ----------------------------------------------------- |
 | `barkd-sub`        | `barkd`       | 4000          | The wallet daemon itself — HTTP and WebSocket         |
 | `api-sub`          | The Node API  | 4001          | The login gate and the proxy that holds barkd's token |
-| `nginx-sub`        | nginx         | 8080          | Serves the app and proxies to the API                 |
+| `nginx-sub`        | nginx         | 8080          | Serves the app and proxies to the API; mounts nothing |
 | `backup-agent-sub` | A shell agent | —             | Watches the wallet database and ships snapshots       |
 
-The `barkd` and `rclone` binaries are fetched from their upstream releases with pinned checksums; the web app and API are built from the upstream tag. `--no-ui` disables barkd's embedded frontend and its bearer-token startup URL; the password-protected Node API and nginx serve the wallet instead.
+The `barkd` and `rclone` binaries are fetched from their upstream releases with pinned checksums; the web app and API are built from the upstream tag, and the build fails unless that tag still names the pinned commit. `--no-ui` disables barkd's embedded frontend and its bearer-token startup URL; the password-protected Node API and nginx serve the wallet instead.
 
 **`--expose-mnemonic` is passed to `barkd` and is load-bearing.** Upstream made the mnemonic endpoint opt-in and 404 by default, and the wallet's Settings screen is the only place a user can read their recovery phrase after onboarding: a wallet created before this release was generated for them and never displayed one, the create flow lets them skip the confirmation step, and an imported wallet never shows it at all. Without the flag such a user could never record the seed that both recovers their funds and decrypts their backups. It is safe because the endpoint is reachable only through the API's session-guarded route, on a daemon bound to loopback behind a bearer token.
 
@@ -121,7 +121,7 @@ Bound on the `ui-multi` MultiHost over HTTP and not masked. `barkd` and the API 
 - **Changing the password signs everyone out**, immediately, because the signing key folds in the password and the API reads it live per request.
 - **The cookie's `Secure` flag is set from the forwarded protocol**, so the same build works over Tor's HTTP and LAN's HTTPS.
 - **CSRF needs both** a strict-same-site cookie and a custom header on state-changing methods, and login carries a global exponential-backoff lockout.
-- **The seed is served by one session-guarded route only.** The proxy 404s the underlying endpoint under any path encoding, and nginx blocks the exact path as a second layer.
+- **The seed is served by one session-guarded route only.** The proxy 404s the underlying endpoint under any path encoding, and nginx 404s any `/api/barkd/` path containing `mnemonic` as a second layer. nginx also refuses framing (`X-Frame-Options: DENY`) and MIME sniffing, and hides its version.
 - **The notifications WebSocket needs a single-use ticket** minted through the gated REST surface, which itself requires the bearer token injected server-side.
 
 ## Installation and First-Run Flow
@@ -166,7 +166,8 @@ A continuous backup is the encrypted wallet snapshot the agent keeps current on 
 - **Repeat safety:** idempotent. Entries are saved even for targets left disabled, and disabling one keeps its credentials.
 - **Google Drive and Dropbox take two passes** — submit once with app credentials to get a sign-in link, approve it, then paste the returned code back into the form. A fresh code wins over the prefilled refresh token, and a new Client ID or App Key clears the saved token and must come with its own secret.
 - **Google ends the sign-in it gives a Google Cloud app still in Testing after 7 days.** When Google's token response carries `refresh_token_expires_in`, the result gives the date. Publishing the app needs a home page, a privacy policy link and an authorized domain on its Branding page; a logo or more than 10 authorized domains would also need Google's verification. The agent records a refused sign-in (`invalid_grant`, or Drive's `authError`) as `<target>: signin`, which the health check and the next submit both explain, the submit with a fresh sign-in link.
-- **A Nextcloud on the LAN with a self-signed certificate** needs the trust toggle enabled.
+- **A Nextcloud on the LAN with a self-signed certificate** needs the trust toggle enabled. With it on, the snapshot stays encrypted, but anyone in between can read the app password and change or delete the backups.
+- **An SFTP server's host key is pinned** (`sftp.knownHosts`, in `backup-config.json` and so in the StartOS backup). Saving the target scans the key and shows its fingerprint; a target saved before keys were pinned is pinned by the agent on its first connection. A different key afterwards fails that target as `sftp: hostkey`, at backup and at restore, and nothing is sent to it. Saving the target again re-scans when the host or port changed or that failure is current, which is how a rebuilt server's new key is accepted.
 - **An SFTP folder path is resolved against the directory the server starts the login in** — the home directory on a stock OpenSSH server, the top of a share or of the chroot on a NAS or a chrooted account — which rclone reads from the server on connect.
 - **A Nextcloud address is completed to `/remote.php/dav/files/USER/`**, where Nextcloud serves a user's files over WebDAV — a bare server address, the `/remote.php/dav/` interface the StartOS Nextcloud package exports, or `/remote.php/webdav` all become that, while an address already naming `/dav/files/` is kept as pasted.
 - **What to do next:** run Back Up Now to confirm the target works, then take a StartOS backup — the config is the pointer a restore needs.
@@ -178,7 +179,7 @@ Forces an immediate snapshot and upload. Run it to verify a newly configured tar
 - **When to run it:** only while the service is running.
 - **Confirmation:** asked for before it runs.
 - **What it changes:** ships a snapshot to every enabled target and updates the backup state.
-- **Repeat safety:** idempotent.
+- **Repeat safety:** idempotent. It waits for an in-flight automatic backup before taking its snapshot.
 
 ## Tasks
 
@@ -223,12 +224,14 @@ A StartOS backup is point-in-time and stops the service, so it cannot capture a 
 
 So the two halves are split:
 
-- **The backup agent ships the database continuously**, encrypted with a key derived from the seed, to every enabled target — plus, always, to an on-box local copy. It snapshots on change with a periodic backstop. On an external target the snapshot and its freshness marker sit at `<folder>/<wallet id>/`, the wallet id being an HMAC of the mnemonic, so wallets that share an account stay apart and the name tells the target nothing; the local copy stays at `/data/local-backups`. It never ships a database that holds no wallet, so a failed restore cannot overwrite the good copies.
+- **The backup agent ships the database continuously**, encrypted with a key derived from the seed, to every enabled target — plus, always, to an on-box local copy. It snapshots on change with a periodic backstop. On an external target the snapshot and its freshness marker sit at `<folder>/<wallet id>/`, the wallet id being an HMAC of the mnemonic, so wallets that share an account stay apart and the name tells the target nothing; the local copy stays at `/data/local-backups`. It never ships a database that holds no wallet, so a failed restore cannot overwrite the good copies. Each snapshot carries its own generation in a `startos_backup_gen` table; restore rejects a stamped snapshot older than the marker ranking it.
 - **The StartOS backup keeps the small, static remainder**: the seed, the bearer token, the login password, the backup configuration, the freshness watermark, and the local snapshots.
 
 Excluded from the StartOS backup: the database and its journals, the backup status file, `barkd`'s debug log, and the session secret — the last so that a restore regenerates it and forces a clean re-login.
 
-**Restore pulls the newest copy, and refuses a stale one.** The post-restore hook sets a flag; on the next start, a oneshot fetches and decrypts the freshest snapshot from the configured targets — each target's wallet folder and, for copies made before wallets had one, its folder root — and writes the database _before_ `barkd` opens it. A copy counts only if it decrypts to sound SQLite holding the `bark_properties` row `barkd` needs to open it, so a target serving an empty or damaged copy is skipped for the next-freshest. A restore that loads nothing stays pending and runs again on the next start, first discarding the bare database `barkd` creates when it starts without one. Every candidate, including a fallback, must meet the restored watermark; an older or undated copy is **refused** rather than reverting the wallet. Undated legacy copies remain eligible only when no watermark was restored. Independent targets can supply a current copy when another is rolled back or damaged.
+The watcher, Back Up Now and the restore oneshot serialize on `flock` over `/data/backup-agent.lock`, shared across their subcontainers.
+
+**Restore pulls the newest copy, and refuses a stale one.** The post-restore hook sets a flag; on the next start, a oneshot fetches and decrypts the freshest snapshot from the configured targets — each target's wallet folder and, for copies made before wallets had one, its folder root — and writes the database _before_ `barkd` opens it. **It waits while any enabled target cannot be consulted**: an unreachable target, one presenting a different SFTP host key, or one returning an unreadable marker may hold the newest copy, so loading another could restore an older wallet. Only rclone's "nothing at that path" (exit 3 or 4) counts as a target holding no copy. The restore stays pending, and the error says to fix the target or disable it if it is gone for good. This also applies when a marker was read successfully but the snapshot download then fails with a transport, authentication, or host-key error: an earlier successful marker read does not authorize loading an older copy. A missing or damaged snapshot can still be skipped within the watermark bound. A copy counts only if it decrypts to sound SQLite holding the `bark_properties` row `barkd` needs to open it, so a target serving an empty or damaged copy is skipped for the next-freshest. A restore that loads nothing stays pending and runs again on the next start, first discarding the bare database `barkd` creates when it starts without one. Every candidate, including a fallback, must meet the restored watermark — by its marker to be tried, and by the generation inside the snapshot to be loaded; an older or undated copy is **refused** rather than reverting the wallet. A stamped snapshot older than the marker ranking it is skipped. A folder-root copy that fails to decrypt is another wallet's, from before wallets had folders, and is skipped; any other failure there holds the restore. Copies from before snapshots carried a generation are judged by their marker, and only while the restored watermark predates that too; undated copies remain eligible only when no watermark was restored. Independent targets can supply a current copy when another is rolled back or damaged.
 
 If no usable snapshot can be loaded, `barkd` exits with `failed to read properties` and the web UI cannot start. The mnemonic alone does not trigger automatic seed recovery in this package; restore stays pending for a later start.
 
@@ -243,6 +246,9 @@ If no usable snapshot can be loaded, `barkd` exits with `failed to read properti
 5. **Rotating the login password signs out every session**, unavoidably.
 6. **There is no configuration form.** Changing the Ark server or network means editing the package source and rebuilding.
 7. **A rolled-back backup target is refused, not merged.** The service will ask for a current copy rather than load an older one.
+8. **A restore waits for every enabled target.** One that is down holds the restore until it is back or disabled.
+9. **One server per wallet.** Backups assume a single writer: running the same wallet on two servers at once, or rolling a target back from its own backup, is unsupported, and either can leave a target holding a copy that is not the newest.
+10. **A snapshot newer than the last StartOS backup can be replayed undetected** by whoever controls a target: the watermark only knows what that backup recorded. Two independent targets bound this.
 
 ---
 

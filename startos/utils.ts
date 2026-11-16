@@ -66,7 +66,11 @@ export const describeBackupError = (error: string) =>
           ? i18n(
               'Dropbox: the saved sign-in was refused. Sign in again in Configure Continuous Backups.',
             )
-          : part,
+          : part === 'sftp: hostkey'
+            ? i18n(
+                'SFTP: the server presented a different host key than the one saved, so nothing was sent to it. If the server was rebuilt or its key was changed on purpose, save the SFTP target again in Configure Continuous Backups to accept the new key.',
+              )
+            : part,
     )
     .join('; ')
 
