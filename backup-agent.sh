@@ -343,21 +343,17 @@ do_restore() {
     log "no reachable targets (will retry next start)"; exit 0
   fi
   sort -rn "$WORK/gens" > "$WORK/gens.sorted"
-  _best=$(numor0 "$(head -n1 "$WORK/gens.sorted" | awk '{print $1}')")
-
-  # Rollback detection: the newest target is older than what we last shipped.
-  if [ "$_best" -gt 0 ] && [ "$_floor" -gt 0 ] && [ "$_best" -lt "$_floor" ]; then
-    log "STALE: newest target snapshot (gen=$_best) is older than last known (gen=$_floor) — target rolled back. Refusing to restore a stale wallet."
-    state_set_str lastError "Backup target looks rolled back (newest gen=$_best is older than last known $_floor). Refused to restore a stale wallet — replace/fix the target with a current copy, then restart. barkd is running with no wallet until then; the target is left untouched."
-    # Leave pendingRestore set (retry once a fresh target appears) and seed
-    # nothing — barkd waits for the user, so the target is not overwritten.
-    exit 0
-  fi
 
   # Seed from the freshest copy that pulls + verifies.
   while read -r _g _name _section; do
     _label=$_name
     [ "${_section%_legacy}" = "$_section" ] || _label="$_name root"
+    # The restored watermark bounds every candidate, including fallback and undated copies.
+    if [ "$_floor" -gt 0 ] && [ "$_g" -lt "$_floor" ]; then
+      log "[$_label] snapshot generation $_g is below required $_floor (0 means unknown); refusing restore"
+      state_set_str lastError "No usable wallet snapshot meets the last known generation $_floor. Refused a stale or undated copy (gen=$_g) — replace/fix the target with a current copy, then restart. The wallet cannot start until a usable snapshot is restored; targets are left untouched."
+      exit 0
+    fi
     log "[$_label] pulling + decrypting snapshot (gen=$_g)..."
     rm -f "$WALLET_DIR/db.sqlite.restored"
     _extra=$(tls_flag "$_name")
