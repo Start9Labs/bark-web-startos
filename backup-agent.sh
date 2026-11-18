@@ -389,7 +389,8 @@ do_restore() {
     _label=$_name
     [ "${_section%_legacy}" = "$_section" ] || _label="$_name root"
     remote_is_onion "$_name" && { log "[$_label] skipped (.onion unsupported)"; continue; }
-    rm -f "$WORK/m.json"
+    # -r: a target can serve a folder under this name, and copyto then leaves a directory.
+    rm -rf "$WORK/m.json"
     _extra=$(tls_flag "$_name")
     # shellcheck disable=SC2086
     _out=$(rclone --config "$RCONF" copyto "${_section}:$META_NAME" "$WORK/m.json" $RCLONE_FLAGS $_extra 2>&1)
@@ -438,14 +439,15 @@ do_restore() {
       exit 0
     fi
     log "[$_label] pulling + decrypting snapshot (gen=$_g)..."
-    rm -f "$WALLET_DIR/db.sqlite.restored"
+    # -r here and below: a target can serve a folder named wallet.db, left here as a directory.
+    rm -rf "$WALLET_DIR/db.sqlite.restored"
     _extra=$(tls_flag "$_name")
     # shellcheck disable=SC2086
     _out=$(rclone --config "$RCONF" copyto "${_section}:$ENC_NAME" "$WALLET_DIR/db.sqlite.restored" $RCLONE_FLAGS $_extra 2>&1)
     _rc=$?
     if [ "$_rc" -ne 0 ]; then
       log "[$_label] pull/decrypt failed: $(echo "$_out" | tail -n 2 | tr '\n' ' ')"
-      rm -f "$WALLET_DIR/db.sqlite.restored"
+      rm -rf "$WALLET_DIR/db.sqlite.restored"
       if ! missing_rc "$_rc" && ! crypt_payload_invalid "$_out"; then
         [ "$(failure_reason "$_out")" != hostkey ] || _hostkey=1
         hold_restore "$_label" "$_hostkey"
@@ -461,19 +463,19 @@ do_restore() {
       if [ "$_own" -eq 0 ] && [ "$_stamped" -lt 2 ]; then _own=$_g; fi
       if [ "$_floor" -gt 0 ] && [ "$_own" -lt "$_floor" ]; then
         log "[$_label] the snapshot itself is from gen=$_own, below required $_floor; trying the next copy"
-        rm -f "$WALLET_DIR/db.sqlite.restored"
+        rm -rf "$WALLET_DIR/db.sqlite.restored"
         continue
       fi
       # A marker cannot rank a stamped snapshot above its own generation.
       if [ "$_own" -lt "$_g" ]; then
         log "[$_label] marker says gen=$_g but the snapshot is older (gen=$_own); trying the next copy"
-        rm -f "$WALLET_DIR/db.sqlite.restored"
+        rm -rf "$WALLET_DIR/db.sqlite.restored"
         continue
       fi
       [ "$_own" = "$_g" ] || log "[$_label] marker says gen=$_g, the snapshot itself gen=$_own"
       if ! sqlite3 "$WALLET_DIR/db.sqlite.restored" "DROP TABLE IF EXISTS $GEN_TABLE" 2>/dev/null; then
         log "[$_label] could not prepare the snapshot; trying the next copy"
-        rm -f "$WALLET_DIR/db.sqlite.restored"
+        rm -rf "$WALLET_DIR/db.sqlite.restored"
         continue
       fi
       mv "$WALLET_DIR/db.sqlite.restored" "$DB"
@@ -483,7 +485,7 @@ do_restore() {
       exit 0
     fi
     log "[$_label] decrypted snapshot holds no wallet; trying the next copy"
-    rm -f "$WALLET_DIR/db.sqlite.restored"
+    rm -rf "$WALLET_DIR/db.sqlite.restored"
   done < "$WORK/gens.sorted"
 
   log "could not restore from any target (will retry next start)"
