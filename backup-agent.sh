@@ -389,8 +389,7 @@ do_restore() {
     _label=$_name
     [ "${_section%_legacy}" = "$_section" ] || _label="$_name root"
     remote_is_onion "$_name" && { log "[$_label] skipped (.onion unsupported)"; continue; }
-    # -r: a target serving a folder under the marker's name makes copyto leave
-    # a directory here, which would fail every later target's marker pull.
+    # -r: a target can serve a folder under this name, and copyto then leaves a directory.
     rm -rf "$WORK/m.json"
     _extra=$(tls_flag "$_name")
     # shellcheck disable=SC2086
@@ -440,9 +439,7 @@ do_restore() {
       exit 0
     fi
     log "[$_label] pulling + decrypting snapshot (gen=$_g)..."
-    # -r here and below: a target serving a folder named wallet.db makes copyto
-    # leave a directory here. On /data it would outlive the run, failing every
-    # later pull — of every target, on every start — until removed by hand.
+    # -r here and below: a target can serve a folder named wallet.db, left here as a directory.
     rm -rf "$WALLET_DIR/db.sqlite.restored"
     _extra=$(tls_flag "$_name")
     # shellcheck disable=SC2086
