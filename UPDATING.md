@@ -6,7 +6,7 @@ This package pins three upstream artifacts in `bark.Dockerfile`:
 - **`barkd`** — the wallet daemon, fetched as a release binary with a pinned SHA-256 (`BARK_VERSION`).
 - **`rclone`** — the backup agent's transfer tool, fetched as a release `.deb` with a pinned SHA-256 (`RCLONE_VERSION`). It moves on its own cadence, independent of the two above.
 
-`bark-web` and `barkd` are versioned independently. Keep `BARK_VERSION` aligned with the daemon release that the `bark-web` tag pins in `.env.mainnet`, `docker/checksums.env`, and `start9-app/Dockerfile`. The bundled `@secondts/barkd` JS client can be a patch ahead of that binary — client 0.7.2 is generated from daemon 0.7.1's spec — so the client version alone does not select the daemon artifact.
+`bark-web` and `barkd` are versioned independently. Keep `BARK_VERSION` aligned with the daemon release that the `bark-web` tag pins in `.env.mainnet` and `docker/checksums.env`. The bundled `@secondts/barkd` JS client can be a patch ahead of that binary — client 0.7.2 is generated from daemon 0.7.1's spec — so the client version alone does not select the daemon artifact.
 
 The client is generated from the daemon's OpenAPI spec. Only move the daemon ahead of bark-web's own pin when `bark-rest/openapi.json` is unchanged between the two daemon tags apart from its `version` string:
 
@@ -20,10 +20,10 @@ curl -s 'https://gitlab.com/api/v4/projects/ark-bitcoin%2Fbark/repository/compar
 - **bark-web** ([ark-bitcoin/bark-web](https://gitlab.com/ark-bitcoin/bark-web)) — latest git tag:
 
   ```sh
-  git ls-remote --tags https://gitlab.com/ark-bitcoin/bark-web.git | tail
+  git ls-remote --tags --sort=v:refname https://gitlab.com/ark-bitcoin/bark-web.git | tail
   ```
 
-  Confirm the paired daemon release in that tag's `.env.mainnet`, `docker/checksums.env`, and `start9-app/Dockerfile`. Also record the bundled client version from `package-lock.json` under `node_modules/@secondts/barkd`; a patch difference is expected when upstream pins one.
+  Confirm the paired daemon release in that tag's `.env.mainnet` and `docker/checksums.env`. Also record the bundled client version from `package-lock.json` under `node_modules/@secondts/barkd`; a patch difference is expected when upstream pins one.
 
 - **barkd** ([ark-bitcoin/bark](https://gitlab.com/ark-bitcoin/bark)) — release tags are named `bark-<version>`:
 

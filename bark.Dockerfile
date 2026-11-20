@@ -2,9 +2,9 @@
 # StartOS. The bark-web frontend and its API proxy are built from the upstream
 # git tag; barkd and rclone are fetched as release binaries with pinned checksums.
 
-ARG BARK_WEB_VERSION=0.11.0
-ARG BARK_WEB_COMMIT=d058a8df0b001aa2d4672028e8d67f8bf6c95695
-ARG BARK_VERSION=0.8.1
+ARG BARK_WEB_VERSION=0.12.0
+ARG BARK_WEB_COMMIT=3207f6cd38d8dfca5ddeb1a3bec50043f12a3b74
+ARG BARK_VERSION=0.9.0
 ARG RCLONE_VERSION=1.76.0
 
 # ---- Upstream source checkout ----
@@ -42,8 +42,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
     && rm -rf /var/lib/apt/lists/*
 ARG BARK_VERSION
 ARG TARGETARCH
-ARG BARKD_SHA256_AMD64=e634724a17796de352beb2e28808059dd3d0aef1beb3afd358ee3a582c20c85c
-ARG BARKD_SHA256_ARM64=e781f4f85bbad52655d5f10369fd07fb3ae1a8b2a47f7e8f2b54fea42653e463
+ARG BARKD_SHA256_AMD64=840d559de5a6b744bac0fedeea66e32d985e01c62763393f1e896e0c53dc1eb4
+ARG BARKD_SHA256_ARM64=7dd4b94db8512cf021060c14828d916547326f93a625e78bfeb870ad3eadd344
 WORKDIR /out
 RUN case "${TARGETARCH}" in \
       amd64) ARCH="x86_64"; SHA="${BARKD_SHA256_AMD64}" ;; \
