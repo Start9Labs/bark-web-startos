@@ -119,7 +119,7 @@ Bound on the `ui-multi` MultiHost over HTTP and not masked. `barkd` and the API 
 
 - **It fails closed.** With no password file the API returns `503` on every wallet route rather than serving an open wallet, so a fresh install cannot be reached before its password task is done. The auth flag is also baked into the image, so a dropped runtime variable cannot open it either. Upstream's first-run password endpoint, which sets a password when none exists, is inert here: the password task is critical, so the service never starts without the file it needs, and the endpoint answers `409` once one exists.
 - **Changing the password signs everyone out**, immediately, because the signing key folds in the password and the API reads it live per request.
-- **The cookie's `Secure` flag is set from the forwarded protocol**, so the same build works over Tor's HTTP and LAN's HTTPS.
+- **The cookie's `Secure` flag follows the `X-Forwarded-Proto: https` StartOS adds on its TLS leg**, which nginx passes through, so the cookie is `Secure` over LAN HTTPS and still works over Tor's plain HTTP.
 - **CSRF needs both** a strict-same-site cookie and a custom header on state-changing methods, and login carries a global exponential-backoff lockout.
 - **The seed is served by one session-guarded route only.** The proxy 404s the underlying endpoint under any path encoding, and nginx 404s any `/api/barkd/` path containing `mnemonic` as a second layer. nginx also refuses framing (`X-Frame-Options: DENY`) and MIME sniffing, and hides its version.
 - **The notifications WebSocket needs a single-use ticket** minted through the gated REST surface, which itself requires the bearer token injected server-side.
